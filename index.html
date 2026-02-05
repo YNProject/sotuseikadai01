@@ -1,102 +1,181 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
     <meta charset="utf-8">
     <title>WebAR Photo Space</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+    
     <style>
+        body { margin: 0; overflow: hidden; touch-action: none; }
+        
+        /* UIコンテナを最前面に配置 */
         .ui-container {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; display: flex; gap: 10px; width: 90%; justify-content: center;
+            position: fixed; 
+            bottom: 30px; 
+            left: 50%; 
+            transform: translateX(-50%);
+            z-index: 10000 !important; 
+            display: flex; 
+            gap: 15px; 
+            width: 90%; 
+            justify-content: center;
+            pointer-events: auto !important;
         }
+
         button, label {
-            padding: 15px; background: rgba(0,0,0,0.7); color: white;
-            border-radius: 50px; border: 2px solid white; font-size: 14px;
+            padding: 15px 25px; 
+            background: rgba(0,0,0,0.85); 
+            color: white;
+            border-radius: 50px; 
+            border: 2px solid #fff; 
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            flex: 1;
+            max-width: 200px;
+            pointer-events: auto !important;
+            -webkit-tap-highlight-color: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+
+        /* ARのキャンバスがUIを邪魔しないようにする */
+        canvas.a-canvas { z-index: 1 !important; }
+        .a-enter-vr { display: none; }
     </style>
 </head>
 <body style="margin: 0; overflow: hidden;">
 
     <div class="ui-container">
         <input type="file" id="fileInput" accept="image/*" style="display:none">
-        <label for="fileInput">① 写真を選ぶ</label>
-        <button id="shotBtn">② 写真を撮る</button>
+        <label for="fileInput" id="fileLabel">① 写真を選ぶ</label>
+        <button id="shotBtn" type="button">② 写真を撮る</button>
     </div>
 
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
+    <a-scene embedded 
+             arjs="sourceType: webcam; debugUIEnabled: false;" 
+             renderer="logarithmicDepthBuffer: true; colorManagement: true;"
+             vr-mode-ui="enabled: false"
+             screenshot>
+        
         <a-entity id="myCamera" camera look-controls></a-entity>
+        
     </a-scene>
 
     <script>
-const scene = document.querySelector('a-scene');
-const fileInput = document.getElementById('fileInput');
-let selectedImgUrl = null;
-let canPlace = false;
+        const scene = document.querySelector('a-scene');
+        const fileInput = document.getElementById('fileInput');
+        const fileLabel = document.getElementById('fileLabel');
+        const shotBtn = document.getElementById('shotBtn');
+        let selectedImgUrl = null;
+        let canPlace = false;
 
-fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        if (selectedImgUrl) URL.revokeObjectURL(selectedImgUrl);
-        selectedImgUrl = URL.createObjectURL(file);
-        canPlace = true;
-        document.querySelector('label').innerText = "✅ 画面をタップ！";
-        
-        // 【重要】配置前にブラウザに画像を一度ロードさせておく（真っ白対策）
-        const dummyImg = new Image();
-        dummyImg.src = selectedImgUrl;
-    }
-});
+        // 1. 画像選択時の処理
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                // メモリ解放
+                if (selectedImgUrl) URL.revokeObjectURL(selectedImgUrl);
+                selectedImgUrl = URL.createObjectURL(file);
+                canPlace = true;
+                fileLabel.innerText = "✅ 画面をタップ！";
+                fileLabel.style.background = "#2e7d32";
+            }
+        });
 
-const addPhotoToSpace = (e) => {
-    if (!selectedImgUrl || !canPlace) return;
-    if (e.target.closest('.ui-container')) return;
+        // 2. 配置処理
+        const addPhotoToSpace = (e) => {
+            // UIボタンの上をタップした場合は無視
+            if (e.target.closest('.ui-container')) return;
+            // 写真未選択または配置済みなら何もしない
+            if (!selectedImgUrl || !canPlace) return;
 
-    const cameraEl = document.getElementById('myCamera');
-    const cameraObj = cameraEl.object3D;
+            const cameraEl = document.getElementById('myCamera');
+            const cameraObj = cameraEl.object3D;
 
-    const position = new THREE.Vector3();
-    const direction = new THREE.Vector3();
-    cameraObj.getWorldPosition(position);
-    cameraObj.getWorldDirection(direction);
+            const position = new THREE.Vector3();
+            const direction = new THREE.Vector3();
+            cameraObj.getWorldPosition(position);
+            cameraObj.getWorldDirection(direction);
 
-    // a-imageではなく、より制御しやすいa-entity + geometryで作成
-    const newImage = document.createElement('a-entity');
-    
-    // 【修正点】material設定を詳細に行う（shaderをflatにしてライトの影響を無視）
-    newImage.setAttribute('geometry', 'primitive: plane; width: 1; height: 1;');
-    newImage.setAttribute('material', {
-        src: selectedImgUrl,
-        shader: 'flat',
-        transparent: true,
-        side: 'double' // 裏からも見えるように
-    });
+            // a-planeを使用して作成
+            const newImage = document.createElement('a-plane');
+            
+            // マテリアル設定：両面描画(double)、ライト無視(flat)
+            newImage.setAttribute('material', {
+                src: selectedImgUrl,
+                side: 'double',
+                shader: 'flat',
+                transparent: true
+            });
 
-    const distance = 1.5; 
-    const targetPos = {
-        x: position.x + direction.x * -distance,
-        y: position.y + direction.y * -distance,
-        z: position.z + direction.z * -distance
-    };
+            // 2m先に配置
+            const distance = 2;
+            const targetPos = {
+                x: position.x + direction.x * -distance,
+                y: position.y + direction.y * -distance,
+                z: position.z + direction.z * -distance
+            };
 
-    newImage.setAttribute('position', `${targetPos.x} ${targetPos.y} ${targetPos.z}`);
-    newImage.setAttribute('look-at', '#myCamera');
+            newImage.setAttribute('position', `${targetPos.x} ${targetPos.y} ${targetPos.z}`);
+            newImage.setAttribute('look-at', '#myCamera');
+            newImage.setAttribute('width', '1.5');
+            newImage.setAttribute('height', '1.5');
 
-    scene.appendChild(newImage);
+            // 強制更新処理
+            newImage.addEventListener('materialtextureloaded', () => {
+                const mesh = newImage.getObject3D('mesh');
+                if (mesh && mesh.material && mesh.material.map) {
+                    mesh.material.map.needsUpdate = true;
+                }
+            });
 
-    canPlace = false; 
-    document.querySelector('label').innerText = "① 次の写真を選ぶ";
-};
+            scene.appendChild(newImage);
 
-// タップイベントを確実に拾う設定
-window.addEventListener('mousedown', addPhotoToSpace);
-window.addEventListener('touchstart', (e) => {
-    if(e.touches.length > 1) return;
-    addPhotoToSpace(e);
-}, {passive: false});
+            // 配置制限
+            canPlace = false;
+            fileLabel.innerText = "① 次の写真を選ぶ";
+            fileLabel.style.background = "rgba(0,0,0,0.85)";
+        };
 
-// 撮影機能は前回のままでOK（縦横比対応版）
+        // タップイベント登録
+        window.addEventListener('mousedown', addPhotoToSpace);
+        window.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) return;
+            addPhotoToSpace(e);
+        }, { passive: false });
+
+        // 3. 撮影機能
+        shotBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            try {
+                // A-Frameの標準スクリーンショット機能
+                const canvas = scene.components.screenshot.getCanvas('perspective');
+                
+                // 縦長に補正して保存
+                const w = window.innerWidth;
+                const h = window.innerHeight;
+                const outputCanvas = document.createElement('canvas');
+                outputCanvas.width = w;
+                outputCanvas.height = h;
+                const ctx = outputCanvas.getContext('2d');
+                ctx.drawImage(canvas, 0, 0, w, h);
+
+                const dataURI = outputCanvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.download = `ar-photo-${Date.now()}.png`;
+                link.href = dataURI;
+                link.click();
+            } catch (err) {
+                alert("保存に失敗しました。スクリーンショットを撮ってください。");
+            }
+        });
     </script>
 </body>
 </html>
