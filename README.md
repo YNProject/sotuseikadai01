@@ -20,5 +20,5 @@ https://yugames.sakura.ne.jp/photo-ar/
 - 
 
 ## ⑦フリー項目（感想、シェアしたいこと等なんでも）
-
+プレイ動画　後でアップする
 
