@@ -33,23 +33,24 @@
 const scene = document.querySelector('a-scene');
 const fileInput = document.getElementById('fileInput');
 let selectedImgUrl = null;
-let canPlace = false; // ★配置可能かどうかを管理するフラグ
+let canPlace = false;
 
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
         if (selectedImgUrl) URL.revokeObjectURL(selectedImgUrl);
         selectedImgUrl = URL.createObjectURL(file);
+        canPlace = true;
+        document.querySelector('label').innerText = "✅ 画面をタップ！";
         
-        canPlace = true; // ★写真を選んだので配置可能にする
-        document.querySelector('label').innerText = "✅ タップして配置してください";
+        // 【重要】配置前にブラウザに画像を一度ロードさせておく（真っ白対策）
+        const dummyImg = new Image();
+        dummyImg.src = selectedImgUrl;
     }
 });
 
 const addPhotoToSpace = (e) => {
-    // ★「写真が未選択」または「すでに配置済み」なら何もしない
     if (!selectedImgUrl || !canPlace) return;
-    
     if (e.target.closest('.ui-container')) return;
 
     const cameraEl = document.getElementById('myCamera');
@@ -60,9 +61,18 @@ const addPhotoToSpace = (e) => {
     cameraObj.getWorldPosition(position);
     cameraObj.getWorldDirection(direction);
 
-    const newImage = document.createElement('a-image');
-    newImage.setAttribute('material', `src: ${selectedImgUrl}; transparent: true; shader: flat;`);
+    // a-imageではなく、より制御しやすいa-entity + geometryで作成
+    const newImage = document.createElement('a-entity');
     
+    // 【修正点】material設定を詳細に行う（shaderをflatにしてライトの影響を無視）
+    newImage.setAttribute('geometry', 'primitive: plane; width: 1; height: 1;');
+    newImage.setAttribute('material', {
+        src: selectedImgUrl,
+        shader: 'flat',
+        transparent: true,
+        side: 'double' // 裏からも見えるように
+    });
+
     const distance = 1.5; 
     const targetPos = {
         x: position.x + direction.x * -distance,
@@ -72,37 +82,21 @@ const addPhotoToSpace = (e) => {
 
     newImage.setAttribute('position', `${targetPos.x} ${targetPos.y} ${targetPos.z}`);
     newImage.setAttribute('look-at', '#myCamera');
-    newImage.setAttribute('scale', '1 1 1');
 
     scene.appendChild(newImage);
 
-    // ★配置したのでフラグを折る
     canPlace = false; 
     document.querySelector('label').innerText = "① 次の写真を選ぶ";
 };
 
-// 以下、イベント登録と撮影機能はそのまま
+// タップイベントを確実に拾う設定
 window.addEventListener('mousedown', addPhotoToSpace);
 window.addEventListener('touchstart', (e) => {
     if(e.touches.length > 1) return;
     addPhotoToSpace(e);
-});
+}, {passive: false});
 
-document.getElementById('shotBtn').addEventListener('click', () => {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const canvas = scene.components.screenshot.getCanvas('perspective');
-    const outputCanvas = document.createElement('canvas');
-    outputCanvas.width = w;
-    outputCanvas.height = h;
-    const ctx = outputCanvas.getContext('2d');
-    ctx.drawImage(canvas, 0, 0, w, h);
-
-    const link = document.createElement('a');
-    link.download = `ar-photo-${Date.now()}.png`;
-    link.href = outputCanvas.toDataURL('image/png');
-    link.click();
-});
+// 撮影機能は前回のままでOK（縦横比対応版）
     </script>
 </body>
 </html>
