@@ -1,55 +1,31 @@
-body { 
-    margin: 0; 
-    overflow: hidden; 
-    touch-action: none; 
-    font-family: sans-serif; 
-}
+/* style.css */
+body { margin: 0; overflow: hidden; touch-action: none; font-family: sans-serif; }
 
-/* スタート画面を確実に最前面に */
+/* スタート画面 */
 #start-screen {
-    position: fixed; 
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.9); 
-    color: white;
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    justify-content: center;
-    z-index: 99999; /* 非常に高い値に */
-    cursor: pointer; 
-    transition: opacity 0.5s ease;
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9); color: white;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20000; cursor: pointer; transition: opacity 0.5s ease;
 }
-
-#start-screen h1 { font-size: 32px; margin-bottom: 20px; }
-#start-screen p { animation: blink 2s infinite; }
-
+#start-screen h1 { font-size: 32px; margin-bottom: 10px; letter-spacing: 2px; }
+#start-screen p { font-size: 16px; opacity: 0.8; animation: blink 2s infinite; }
 @keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
 
+/* UIコンテナ（JSでflexに変更されるまで非表示） */
 .ui-container {
-    position: fixed; 
-    bottom: 30px; 
-    left: 50%; 
-    transform: translateX(-50%);
-    z-index: 10000; 
-    display: none; /* 最初は隠す */
-    gap: 10px; 
-    width: 90%; 
-    justify-content: center;
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    z-index: 10000; display: none; gap: 10px; width: 90%; justify-content: center;
+    pointer-events: auto;
 }
 
 button, label {
-    padding: 15px; 
-    background: rgba(0,0,0,0.8); 
-    color: white;
-    border-radius: 50px; 
-    border: 2px solid white; 
-    font-size: 14px;
-    flex: 1; 
-    text-align: center; 
-    cursor: pointer;
-    display: flex; 
-    align-items: center; 
-    justify-content: center;
+    padding: 15px; background: rgba(0,0,0,0.8); color: white;
+    border-radius: 50px; border: 2px solid white; font-size: 14px;
+    flex: 1; text-align: center; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent;
 }
 
 canvas.a-canvas { z-index: 1 !important; }
+.a-enter-vr { display: none; }
