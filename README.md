@@ -1,10 +1,10 @@
 # ①写真AR
-
-- 
+ 
 ![Game Image](./img/photoar01.png)
 
 ## ②説明
 - 撮った写真をARとして表示してそれを写真にとれるアプリです。
+- 飲食店で料理を撮って店を出たらその外観と合わせてさっきの料理の写真をARで出して、それを写真にする。というものです。
 
 ## ③アプリのデプロイURL
 ログイン：　https://yugames.sakura.ne.jp/php04kadai/login.php<br>
