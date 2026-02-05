@@ -1,4 +1,4 @@
-# ①写真AR
+# ①写真AR写真
  
 ![Game Image](./img/photoar01.png)
 
