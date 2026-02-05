@@ -1,64 +1,55 @@
-/* style.css */
 body { 
     margin: 0; 
     overflow: hidden; 
     touch-action: none; 
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background-color: #000;
+    font-family: sans-serif; 
 }
 
-/* スタート画面 */
+/* スタート画面を確実に最前面に */
 #start-screen {
     position: fixed; 
-    inset: 0; /* top, left, right, bottom: 0 と同じ */
-    background: rgba(0,0,0,0.95); 
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9); 
     color: white;
     display: flex; 
     flex-direction: column; 
     align-items: center; 
     justify-content: center;
-    z-index: 20000; 
+    z-index: 99999; /* 非常に高い値に */
     cursor: pointer; 
     transition: opacity 0.5s ease;
 }
 
-#start-screen h1 { 
-    font-size: 2rem; 
-    font-weight: bold;
-    margin-bottom: 1rem; 
-    letter-spacing: 0.1em; 
-}
+#start-screen h1 { font-size: 32px; margin-bottom: 20px; }
+#start-screen p { animation: blink 2s infinite; }
 
-/* 操作UI */
+@keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+
 .ui-container {
     position: fixed; 
-    bottom: 40px; 
+    bottom: 30px; 
     left: 50%; 
     transform: translateX(-50%);
     z-index: 10000; 
-    display: none; 
-    gap: 12px; 
+    display: none; /* 最初は隠す */
+    gap: 10px; 
     width: 90%; 
-    max-width: 400px;
+    justify-content: center;
 }
 
 button, label {
-    padding: 16px 10px; 
+    padding: 15px; 
     background: rgba(0,0,0,0.8); 
     color: white;
-    border-radius: 30px; 
-    border: 2px solid #fff; 
+    border-radius: 50px; 
+    border: 2px solid white; 
     font-size: 14px;
-    font-weight: bold;
     flex: 1; 
     text-align: center; 
     cursor: pointer;
+    display: flex; 
+    align-items: center; 
     justify-content: center;
-    align-items: center;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
-button:active, label:active {
-    transform: scale(0.95);
-    background: rgba(50,50,50,0.9);
-}
+canvas.a-canvas { z-index: 1 !important; }

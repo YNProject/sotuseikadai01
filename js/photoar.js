@@ -1,15 +1,16 @@
-const scene = document.querySelector('a-scene');
+// 要素の取得
+const startScreen = document.getElementById('start-screen');
+const mainUI = document.getElementById('main-ui');
 const fileInput = document.getElementById('fileInput');
 const fileLabel = document.getElementById('fileLabel');
 const shotBtn = document.getElementById('shotBtn');
-const startScreen = document.getElementById('start-screen');
-const mainUI = document.getElementById('main-ui');
+const scene = document.querySelector('a-scene');
 
 let selectedImgUrl = null;
 let canPlace = false;
 let appStarted = false;
 
-// 1. スタート画面の処理
+// スタート画面タップ
 startScreen.addEventListener('click', () => {
     startScreen.style.opacity = '0';
     setTimeout(() => {
@@ -19,7 +20,7 @@ startScreen.addEventListener('click', () => {
     }, 500);
 });
 
-// 2. 写真の選択とリサイズ
+// 写真選択
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -31,11 +32,9 @@ fileInput.addEventListener('change', (e) => {
                 let w = img.width, h = img.height;
                 if (w > h) { if (w > maxSide) { h *= maxSide / w; w = maxSide; } }
                 else { if (h > maxSide) { w *= maxSide / h; h = maxSide; } }
-                
                 const canvas = document.createElement('canvas');
                 canvas.width = w; canvas.height = h;
                 canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                
                 selectedImgUrl = canvas.toDataURL('image/jpeg', 0.8);
                 canPlace = true;
                 fileLabel.innerText = "✅ 画面をタップ！";
@@ -47,48 +46,45 @@ fileInput.addEventListener('change', (e) => {
     }
 });
 
-// 3. AR空間への配置
+// 配置
 const addPhotoToSpace = (e) => {
     if (!appStarted || e.target.closest('.ui-container')) return;
     if (!selectedImgUrl || !canPlace) return;
 
     const cameraObj = document.getElementById('myCamera').object3D;
-    const position = new THREE.Vector3();
-    const direction = new THREE.Vector3();
-    cameraObj.getWorldPosition(position);
-    cameraObj.getWorldDirection(direction);
+    const pos = new THREE.Vector3();
+    const dir = new THREE.Vector3();
+    cameraObj.getWorldPosition(pos);
+    cameraObj.getWorldDirection(dir);
 
-    const newImage = document.createElement('a-plane');
-    newImage.setAttribute('material', 'side: double; shader: flat; transparent: true;');
-    
-    const distance = 1.2;
-    newImage.setAttribute('position', {
-        x: position.x + direction.x * -distance,
-        y: position.y + direction.y * -distance,
-        z: position.z + direction.z * -distance
+    const plane = document.createElement('a-plane');
+    plane.setAttribute('material', 'side: double; shader: flat; transparent: true;');
+    const dist = 1.2;
+    plane.setAttribute('position', {
+        x: pos.x + dir.x * -dist,
+        y: pos.y + dir.y * -dist,
+        z: pos.z + dir.z * -dist
     });
-    newImage.setAttribute('look-at', '#myCamera');
+    plane.setAttribute('look-at', '#myCamera');
 
     const loader = new THREE.TextureLoader();
-    loader.load(selectedImgUrl, (texture) => {
-        const mesh = newImage.getObject3D('mesh');
-        mesh.material.map = texture;
-        mesh.material.needsUpdate = true;
-        const aspect = texture.image.width / texture.image.height;
-        newImage.setAttribute('width', 0.2 * aspect); // サイズ0.2
-        newImage.setAttribute('height', 0.2);
+    loader.load(selectedImgUrl, (tex) => {
+        const aspect = tex.image.width / tex.image.height;
+        plane.setAttribute('width', 0.2 * aspect); // サイズ0.2
+        plane.setAttribute('height', 0.2);
+        plane.getObject3D('mesh').material.map = tex;
     });
 
-    scene.appendChild(newImage);
+    scene.appendChild(plane);
     canPlace = false;
-    fileLabel.innerText = "① 次の写真を選ぶ";
+    fileLabel.innerText = "① 写真を選ぶ";
     fileLabel.style.background = "rgba(0,0,0,0.8)";
 };
 
 window.addEventListener('mousedown', addPhotoToSpace);
 window.addEventListener('touchstart', addPhotoToSpace);
 
-// 4. 撮影と合成
+// 撮影
 shotBtn.addEventListener('click', async () => {
     try {
         const video = document.querySelector('video');
@@ -99,7 +95,7 @@ shotBtn.addEventListener('click', async () => {
         const ctx = finalCanvas.getContext("2d");
 
         ctx.drawImage(video, 0, 0, finalCanvas.width, finalCanvas.height);
-
+        
         const vAspect = video.videoWidth / video.videoHeight;
         const cAspect = sceneCanvas.width / sceneCanvas.height;
         let drawW, drawH, offsetX, offsetY;
@@ -114,25 +110,19 @@ shotBtn.addEventListener('click', async () => {
 
         const dataURL = finalCanvas.toDataURL('image/png');
         
-        // フラッシュ演出
+        // 演出
         const flash = document.createElement('div');
-        flash.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:white;z-index:10001;pointer-events:none;';
+        flash.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:white;z-index:100000;pointer-events:none;';
         document.body.appendChild(flash);
-        setTimeout(() => { 
-            flash.style.transition = 'opacity 0.4s'; 
-            flash.style.opacity = '0'; 
-            setTimeout(() => flash.remove(), 400); 
-        }, 50);
+        setTimeout(() => { flash.style.transition='opacity 0.4s'; flash.style.opacity='0'; setTimeout(()=>flash.remove(),400); }, 50);
 
-        if (navigator.share && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
+        if (navigator.share) {
             const blob = await (await fetch(dataURL)).blob();
-            const file = new File([blob], `ar-capture-${Date.now()}.png`, { type: 'image/png' });
-            await navigator.share({ files: [file] }).catch(() => {});
+            const file = new File([blob], `ar-photo.png`, { type: 'image/png' });
+            await navigator.share({ files: [file] }).catch(()=>{});
         } else {
             const link = document.createElement('a');
-            link.download = `ar-capture-${Date.now()}.png`; 
-            link.href = dataURL; 
-            link.click();
+            link.download = `ar-photo.png`; link.href = dataURL; link.click();
         }
     } catch (err) { console.error(err); }
 });
