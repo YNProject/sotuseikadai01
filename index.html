@@ -5,6 +5,7 @@
     <title>WebAR Photo Space</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
     <style>
         .ui-container {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -25,49 +26,64 @@
     </div>
 
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
-        <a-entity camera look-controls cursor="rayOrigin: mouse"></a-entity>
-        </a-scene>
+        <a-entity id="myCamera" camera look-controls></a-entity>
+    </a-scene>
 
     <script>
         const scene = document.querySelector('a-scene');
         const fileInput = document.getElementById('fileInput');
         let selectedImgUrl = null;
 
-        // 1. 画像を選択したらURLを保持
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
                 selectedImgUrl = URL.createObjectURL(file);
-                alert("画面をタップして配置してください");
+                document.querySelector('label').innerText = "✅ 画面をタップ！";
             }
         });
 
-        // 2. 画面タップで空間に配置
-        window.addEventListener('click', (e) => {
-            if (!selectedImgUrl || e.target.tagName === 'BUTTON' || e.target.tagName === 'LABEL') return;
+        const addPhotoToSpace = (e) => {
+            if (!selectedImgUrl) return;
+            if (e.target.closest('.ui-container')) return;
 
-            // カメラの向いている方向の座標を取得（簡易的にカメラの前方に配置）
-            const camera = document.querySelector('[camera]');
-            const position = camera.object3D.position;
-            const rotation = camera.object3D.rotation;
+            const cameraEl = document.getElementById('myCamera');
+            const cameraObj = cameraEl.object3D;
+
+            const position = new THREE.Vector3();
+            const direction = new THREE.Vector3();
+            
+            cameraObj.getWorldPosition(position);
+            cameraObj.getWorldDirection(direction);
 
             const newImage = document.createElement('a-image');
             newImage.setAttribute('src', selectedImgUrl);
+
+            // カメラの向いている方向に1.5m先
+            const distance = 1.5; 
+            const targetPos = {
+                x: position.x + direction.x * -distance,
+                y: position.y + direction.y * -distance,
+                z: position.z + direction.z * -distance
+            };
+
+            newImage.setAttribute('position', `${targetPos.x} ${targetPos.y} ${targetPos.z}`);
             
-            // カメラの少し前（-2m）に配置
-            newImage.setAttribute('position', `${position.x} ${position.y} ${position.z - 2}`);
-            // カメラの向きに合わせる
-            newImage.setAttribute('rotation', `0 ${THREE.MathUtils.radToDeg(rotation.y)} 0`);
-            newImage.setAttribute('scale', '1.5 1.5 1');
+            // ★Look-atをカメラのIDに向ける
+            newImage.setAttribute('look-at', '#myCamera');
+            newImage.setAttribute('scale', '1 1 1');
 
             scene.appendChild(newImage);
-        });
+        };
 
-        // 3. カメラ撮影機能
+        // タップとクリック両方に対応
+        window.addEventListener('touchstart', addPhotoToSpace);
+        window.addEventListener('mousedown', addPhotoToSpace);
+
+        // カメラ撮影機能
         document.getElementById('shotBtn').addEventListener('click', () => {
             const canvas = scene.components.screenshot.getCanvas('perspective');
             const link = document.createElement('a');
-            link.download = 'ar-capture.png';
+            link.download = `ar-photo-${Date.now()}.png`;
             link.href = canvas.toDataURL('image/png');
             link.click();
         });
