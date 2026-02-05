@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>WebAR Photo Space</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <style>
+        .ui-container {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; display: flex; gap: 10px; width: 90%; justify-content: center;
+        }
+        button, label {
+            padding: 15px; background: rgba(0,0,0,0.7); color: white;
+            border-radius: 50px; border: 2px solid white; font-size: 14px;
+        }
+    </style>
+</head>
+<body style="margin: 0; overflow: hidden;">
+
+    <div class="ui-container">
+        <input type="file" id="fileInput" accept="image/*" style="display:none">
+        <label for="fileInput">① 写真を選ぶ</label>
+        <button id="shotBtn">② 写真を撮る</button>
+    </div>
+
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
+        <a-entity camera look-controls cursor="rayOrigin: mouse"></a-entity>
+        </a-scene>
+
+    <script>
+        const scene = document.querySelector('a-scene');
+        const fileInput = document.getElementById('fileInput');
+        let selectedImgUrl = null;
+
+        // 1. 画像を選択したらURLを保持
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                selectedImgUrl = URL.createObjectURL(file);
+                alert("画面をタップして配置してください");
+            }
+        });
+
+        // 2. 画面タップで空間に配置
+        window.addEventListener('click', (e) => {
+            if (!selectedImgUrl || e.target.tagName === 'BUTTON' || e.target.tagName === 'LABEL') return;
+
+            // カメラの向いている方向の座標を取得（簡易的にカメラの前方に配置）
+            const camera = document.querySelector('[camera]');
+            const position = camera.object3D.position;
+            const rotation = camera.object3D.rotation;
+
+            const newImage = document.createElement('a-image');
+            newImage.setAttribute('src', selectedImgUrl);
+            
+            // カメラの少し前（-2m）に配置
+            newImage.setAttribute('position', `${position.x} ${position.y} ${position.z - 2}`);
+            // カメラの向きに合わせる
+            newImage.setAttribute('rotation', `0 ${THREE.MathUtils.radToDeg(rotation.y)} 0`);
+            newImage.setAttribute('scale', '1.5 1.5 1');
+
+            scene.appendChild(newImage);
+        });
+
+        // 3. カメラ撮影機能
+        document.getElementById('shotBtn').addEventListener('click', () => {
+            const canvas = scene.components.screenshot.getCanvas('perspective');
+            const link = document.createElement('a');
+            link.download = 'ar-capture.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+</body>
+</html>
