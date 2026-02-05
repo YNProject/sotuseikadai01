@@ -2,56 +2,60 @@
 <html lang="ja">
 <head>
     <meta charset="utf-8">
-    <title>WebAR Ramen Log</title>
+    <title>WebAR Photo Space</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
     
     <style>
         body { margin: 0; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        
         .ui-container {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 10000; display: flex; flex-wrap: wrap; gap: 8px; width: 95%; justify-content: center;
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            z-index: 10000; display: flex; gap: 10px; width: 90%; justify-content: center;
+            pointer-events: auto;
         }
+
         button, label {
-            padding: 12px; background: rgba(0,0,0,0.8); color: white;
-            border-radius: 10px; border: 1px solid white; font-size: 12px;
-            flex: 1; min-width: 100px; text-align: center; cursor: pointer;
+            padding: 15px; background: rgba(0,0,0,0.8); color: white;
+            border-radius: 50px; border: 2px solid white; font-size: 14px;
+            flex: 1; text-align: center; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
+            -webkit-tap-highlight-color: transparent;
         }
-        #fileLabel { background: #4a4a4a; }
-        #memoBtn { background: #2b5797; }
-        #shotBtn { background: #b91d1d; flex: 2; font-size: 14px; }
+
+        /* キャンバスの重なり順を整理 */
         canvas.a-canvas { z-index: 1 !important; }
+        .a-enter-vr { display: none; }
     </style>
 </head>
 <body style="margin: 0; overflow: hidden;">
 
     <div class="ui-container">
         <input type="file" id="fileInput" accept="image/*" style="display:none">
-        <label for="fileInput" id="fileLabel">① 写真</label>
-        <button id="memoBtn" type="button">② メモ</button>
-        <button id="shotBtn" type="button">📸 撮影保存</button>
+        <label for="fileInput" id="fileLabel">① 写真を選ぶ</label>
+        <button id="shotBtn" type="button">② 写真を撮る</button>
     </div>
 
     <a-scene embedded 
              arjs="sourceType: webcam; debugUIEnabled: false;" 
-             renderer="preserveDrawingBuffer: true; colorManagement: true;"
-             vr-mode-ui="enabled: false" screenshot>
+             renderer="preserveDrawingBuffer: true; logarithmicDepthBuffer: true; colorManagement: true;"
+             vr-mode-ui="enabled: false" 
+             screenshot>
+        
         <a-entity id="myCamera" camera look-controls></a-entity>
+        
     </a-scene>
 
     <script>
         const scene = document.querySelector('a-scene');
         const fileInput = document.getElementById('fileInput');
         const fileLabel = document.getElementById('fileLabel');
-        const memoBtn = document.getElementById('memoBtn');
         const shotBtn = document.getElementById('shotBtn');
-        
         let selectedImgUrl = null;
-        let pendingText = null;
+        let canPlace = false;
 
-        // --- 写真の準備 ---
+        // 1. 画像の選択と軽量化処理
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -59,15 +63,25 @@
                 reader.onload = (event) => {
                     const img = new Image();
                     img.onload = () => {
-                        const canvas = document.createElement('canvas');
+                        // 軽量化：最大1024pxにリサイズ
                         const maxSide = 1024;
-                        let w = img.width, h = img.height;
-                        if (w > h) { if (w > maxSide) { h *= maxSide/w; w = maxSide; } }
-                        else { if (h > maxSide) { w *= maxSide/h; h = maxSide; } }
-                        canvas.width = w; canvas.height = h;
-                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > height) {
+                            if (width > maxSide) { height *= maxSide / width; width = maxSide; }
+                        } else {
+                            if (height > maxSide) { width *= maxSide / height; height = maxSide; }
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width; canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // DataURLとして保持（セキュリティ制限回避）
                         selectedImgUrl = canvas.toDataURL('image/jpeg', 0.8);
-                        fileLabel.innerText = "✅ 配置OK";
+                        canPlace = true;
+                        fileLabel.innerText = "✅ 画面をタップ！";
                         fileLabel.style.background = "#2e7d32";
                     };
                     img.src = event.target.result;
@@ -76,110 +90,111 @@
             }
         });
 
-        // --- メモの準備 ---
-        memoBtn.addEventListener('click', () => {
-            const text = prompt("店名や感想を入力してください", "");
-            if (text) {
-                pendingText = text;
-                memoBtn.innerText = "✅ メモ配置OK";
-                memoBtn.style.background = "#2e7d32";
-            }
-        });
-
-        // --- AR配置処理 ---
-        const placeObject = (e) => {
+        // 2. 配置処理
+        const addPhotoToSpace = (e) => {
             if (e.target.closest('.ui-container')) return;
-            if (!selectedImgUrl && !pendingText) return;
+            if (!selectedImgUrl || !canPlace) return;
 
-            const cameraObj = document.getElementById('myCamera').object3D;
-            const pos = new THREE.Vector3();
-            const dir = new THREE.Vector3();
-            cameraObj.getWorldPosition(pos);
-            cameraObj.getWorldDirection(dir);
-            const targetPos = { x: pos.x + dir.x * -2, y: pos.y + dir.y * -2, z: pos.z + dir.z * -2 };
+            const cameraEl = document.getElementById('myCamera');
+            const cameraObj = cameraEl.object3D;
+            const position = new THREE.Vector3();
+            const direction = new THREE.Vector3();
+            cameraObj.getWorldPosition(position);
+            cameraObj.getWorldDirection(direction);
 
-            // 写真を配置する場合
-            if (selectedImgUrl) {
-                const plane = document.createElement('a-plane');
-                plane.setAttribute('position', targetPos);
-                plane.setAttribute('look-at', '#myCamera');
-                plane.setAttribute('material', 'side:double; shader:flat; transparent:true;');
-                new THREE.TextureLoader().load(selectedImgUrl, (tex) => {
-                    const aspect = tex.image.width / tex.image.height;
-                    plane.setAttribute('width', 0.3 * aspect);
-                    plane.setAttribute('height', 0.3);
-                    plane.getObject3D('mesh').material.map = tex;
-                });
-                scene.appendChild(plane);
-                selectedImgUrl = null; // 1回配置したらリセット
-                fileLabel.innerText = "① 写真";
-                fileLabel.style.background = "rgba(0,0,0,0.8)";
-            } 
-            // メモを配置する場合
-            else if (pendingText) {
-                const container = document.createElement('a-entity');
-                container.setAttribute('position', targetPos);
-                container.setAttribute('look-at', '#myCamera');
+            const newImage = document.createElement('a-plane');
+            newImage.setAttribute('material', 'side: double; shader: flat; transparent: true; opacity: 0.9;');
+            
+            const distance = 2.0; // 2メートル先に配置
+            newImage.setAttribute('position', {
+                x: position.x + direction.x * -distance,
+                y: position.y + direction.y * -distance,
+                z: position.z + direction.z * -distance
+            });
+            newImage.setAttribute('look-at', '#myCamera');
 
-                // 文字背景の板
-                const bg = document.createElement('a-plane');
-                bg.setAttribute('width', 1.5);
-                bg.setAttribute('height', 0.4);
-                bg.setAttribute('material', 'color: black; opacity: 0.7; shader: flat;');
+            // テクスチャ読み込み
+            const loader = new THREE.TextureLoader();
+            loader.load(selectedImgUrl, (texture) => {
+                const mesh = newImage.getObject3D('mesh');
+                mesh.material.map = texture;
+                mesh.material.opacity = 1.0;
+                mesh.material.needsUpdate = true;
                 
-                // 文字（日本語対応のため画像ではなくa-textを使用。フォント指定なしでも標準で出ます）
-                const textEl = document.createElement('a-text');
-                textEl.setAttribute('value', pendingText);
-                textEl.setAttribute('align', 'center');
-                textEl.setAttribute('width', 4);
-                textEl.setAttribute('wrap-count', 20); // 文字数に応じて調整
-                textEl.setAttribute('color', 'white');
+                // 比率調整（高さ1.5m基準）
+                const aspect = texture.image.width / texture.image.height;
+                newImage.setAttribute('width', 1.5 * aspect);
+                newImage.setAttribute('height', 1.5);
+            });
 
-                container.appendChild(bg);
-                container.appendChild(textEl);
-                scene.appendChild(container);
-                
-                pendingText = null;
-                memoBtn.innerText = "② メモ";
-                memoBtn.style.background = "#2b5797";
-            }
+            scene.appendChild(newImage);
+            canPlace = false;
+            fileLabel.innerText = "① 次の写真を選ぶ";
+            fileLabel.style.background = "rgba(0,0,0,0.8)";
         };
 
-        window.addEventListener('touchstart', placeObject);
-        window.addEventListener('mousedown', placeObject);
+        window.addEventListener('mousedown', addPhotoToSpace);
+        window.addEventListener('touchstart', addPhotoToSpace);
 
-        // --- 撮影合成（以前の完成版そのまま） ---
+        // 3. 撮影機能（背景カメラ映像 + AR合成）
         shotBtn.addEventListener('click', async () => {
             try {
                 const video = document.querySelector('video');
                 const sceneCanvas = scene.components.screenshot.getCanvas('perspective');
-                const finalCanvas = document.createElement("canvas");
-                finalCanvas.width = video.videoWidth; finalCanvas.height = video.videoHeight;
-                const ctx = finalCanvas.getContext("2d");
-                ctx.drawImage(video, 0, 0, finalCanvas.width, finalCanvas.height);
                 
-                const vAspect = video.videoWidth / video.videoHeight;
-                const cAspect = sceneCanvas.width / sceneCanvas.height;
+                const finalCanvas = document.createElement("canvas");
+                finalCanvas.width = video.videoWidth;
+                finalCanvas.height = video.videoHeight;
+                const ctx = finalCanvas.getContext("2d");
+
+                // カメラ映像を描画
+                ctx.drawImage(video, 0, 0, finalCanvas.width, finalCanvas.height);
+
+                // AR部分をアスペクト比を計算して合成
+                const vWidth = video.videoWidth;
+                const vHeight = video.videoHeight;
+                const cWidth = sceneCanvas.width;
+                const cHeight = sceneCanvas.height;
+                const vAspect = vWidth / vHeight;
+                const cAspect = cWidth / cHeight;
+
                 let drawW, drawH, offsetX, offsetY;
                 if (cAspect > vAspect) {
-                    drawH = finalCanvas.height; drawW = finalCanvas.height * cAspect;
-                    offsetX = (finalCanvas.width - drawW) / 2; offsetY = 0;
+                    drawH = vHeight; drawW = vHeight * cAspect;
+                    offsetX = (vWidth - drawW) / 2; offsetY = 0;
                 } else {
-                    drawW = finalCanvas.width; drawH = finalCanvas.width / cAspect;
-                    offsetX = 0; offsetY = (finalCanvas.height - drawH) / 2;
+                    drawW = vWidth; drawH = vWidth / cAspect;
+                    offsetX = 0; offsetY = (vHeight - drawH) / 2;
                 }
                 ctx.drawImage(sceneCanvas, offsetX, offsetY, drawW, drawH);
 
                 const dataURL = finalCanvas.toDataURL('image/png');
-                if (navigator.share) {
+
+                // フラッシュ演出
+                const flash = document.createElement('div');
+                flash.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:white;z-index:10001;pointer-events:none;';
+                document.body.appendChild(flash);
+                setTimeout(() => { 
+                    flash.style.transition = 'opacity 0.4s'; 
+                    flash.style.opacity = '0'; 
+                    setTimeout(() => flash.remove(), 400); 
+                }, 50);
+
+                // 保存または共有
+                if (navigator.share && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
                     const blob = await (await fetch(dataURL)).blob();
-                    const file = new File([blob], `ramen-log.png`, { type: 'image/png' });
-                    await navigator.share({ files: [file] });
+                    const file = new File([blob], `ar-capture-${Date.now()}.png`, { type: 'image/png' });
+                    await navigator.share({ files: [file] }).catch(() => {});
                 } else {
                     const link = document.createElement('a');
-                    link.download = `ramen-log.png`; link.href = dataURL; link.click();
+                    link.download = `ar-capture-${Date.now()}.png`;
+                    link.href = dataURL;
+                    link.click();
                 }
-            } catch (err) { console.error(err); }
+            } catch (err) {
+                console.error(err);
+                alert("撮影に失敗しました。");
+            }
         });
     </script>
 </body>
