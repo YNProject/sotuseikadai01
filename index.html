@@ -106,8 +106,8 @@
                 plane.setAttribute('material', 'side:double; shader:flat; transparent:true;');
                 new THREE.TextureLoader().load(selectedImgUrl, (tex) => {
                     const aspect = tex.image.width / tex.image.height;
-                    plane.setAttribute('width', 1.2 * aspect);
-                    plane.setAttribute('height', 1.2);
+                    plane.setAttribute('width', 0.3 * aspect);
+                    plane.setAttribute('height', 0.3);
                     plane.getObject3D('mesh').material.map = tex;
                 });
                 scene.appendChild(plane);
