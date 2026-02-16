@@ -97,51 +97,61 @@ window.onload = () => {
     window.addEventListener('touchstart', addPhoto, { passive: false });
 
     // 4. 保存ロジック（正しい比率で保存）
-    shotBtn.addEventListener('click', async () => {
-        try {
-            const video = document.querySelector('video');
-            const glCanvas = scene.canvas;
-            if (!video || !glCanvas || !selectedImgUrl) return;
+ // 4. 保存ロジック（画面の見た目通りに保存）
+shotBtn.addEventListener('click', async () => {
+    try {
+        const video = document.querySelector('video');
+        const glCanvas = scene.canvas;
+        if (!video || !glCanvas) return;
 
-            scene.renderer.render(scene.object3D, scene.camera);
+        // A-Frameのレンダリングを最新状態に更新
+        scene.renderer.render(scene.object3D, scene.camera);
 
-            const canvas = document.createElement('canvas');
-            canvas.width = glCanvas.width;
-            canvas.height = glCanvas.height;
-            const ctx = canvas.getContext('2d');
+        // 1. 保存用のCanvasを作成
+        // glCanvasの実解像度（内部バッファサイズ）を基準にする
+        const canvas = document.createElement('canvas');
+        canvas.width = glCanvas.width;
+        canvas.height = glCanvas.height;
+        const ctx = canvas.getContext('2d');
 
-            // ビデオ背景を描画（object-fit: cover 相当）
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
-            const videoAspect = vw / vh;
-            const canvasAspect = canvas.width / canvas.height;
+        // 2. 背景ビデオの描画
+        // ビデオのどの部分が画面に表示されているかを計算（object-fit: coverの再現）
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const videoAspect = vw / vh;
+        const canvasAspect = canvas.width / canvas.height;
 
-            let sx, sy, sWidth, sHeight;
-            if (videoAspect > canvasAspect) {
-                sWidth = vh * canvasAspect;
-                sHeight = vh;
-                sx = (vw - sWidth) / 2;
-                sy = 0;
-            } else {
-                sWidth = vw;
-                sHeight = vw / canvasAspect;
-                sx = 0;
-                sy = (vh - sHeight) / 2;
-            }
-
-            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
-
-            // ARレイヤーを描画
-            const bitmap = await createImageBitmap(glCanvas);
-            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-
-            const url = canvas.toDataURL('image/png');
-            saveImage(url);
-
-        } catch (e) {
-            console.error("Capture failed:", e);
+        let sx, sy, sWidth, sHeight;
+        if (videoAspect > canvasAspect) {
+            // ビデオの方が横長（左右をカット）
+            sWidth = vh * canvasAspect;
+            sHeight = vh;
+            sx = (vw - sWidth) / 2;
+            sy = 0;
+        } else {
+            // ビデオの方が縦長（上下をカット）
+            sWidth = vw;
+            sHeight = vw / canvasAspect;
+            sx = 0;
+            sy = (vh - sHeight) / 2;
         }
-    });
+
+        // 背景を描画
+        ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+
+        // 3. ARレイヤー（写真オブジェクト）を描画
+        // createImageBitmapを使用して、現在のGLコンテキストから絵をコピー
+        const bitmap = await createImageBitmap(glCanvas);
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+        const url = canvas.toDataURL('image/png');
+        saveImage(url);
+
+    } catch (e) {
+        console.error("Capture failed:", e);
+        alert("キャプチャに失敗しました。");
+    }
+});
 
     // 5. 保存・共有用関数
     async function saveImage(url) {
