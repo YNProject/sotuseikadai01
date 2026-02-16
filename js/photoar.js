@@ -10,7 +10,6 @@ window.onload = () => {
     let canPlace = false;
     let appStarted = false;
 
-    // 1. スタート画面制御
     startScreen.addEventListener('click', () => {
         startScreen.style.opacity = '0';
         setTimeout(() => {
@@ -20,7 +19,6 @@ window.onload = () => {
         }, 400);
     });
 
-    // 2. 画像選択・リサイズ
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -34,8 +32,7 @@ window.onload = () => {
                 if (w > h && w > max) { h *= max / w; w = max; }
                 else if (h > max) { w *= max / h; h = max; }
                 c.width = w; c.height = h;
-                const ctx = c.getContext('2d');
-                ctx.drawImage(img, 0, 0, w, h);
+                c.getContext('2d').drawImage(img, 0, 0, w, h);
                 selectedImgUrl = c.toDataURL('image/jpeg', 0.9);
                 canPlace = true;
                 fileLabel.innerText = "✅ 画面をタップ！";
@@ -46,7 +43,6 @@ window.onload = () => {
         reader.readAsDataURL(file);
     });
 
-    // 3. AR平面の配置
     function addPhoto(e) {
         if (!appStarted || e.target.closest('.ui-container')) return;
         if (!selectedImgUrl || !canPlace) return;
@@ -60,6 +56,7 @@ window.onload = () => {
 
         const plane = document.createElement('a-plane');
         plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
+
         const dist = 1.2;
         plane.setAttribute('position', {
             x: pos.x - dir.x * dist,
@@ -70,17 +67,15 @@ window.onload = () => {
         scene.appendChild(plane);
 
         new THREE.TextureLoader().load(selectedImgUrl, tex => {
-            const mesh = plane.getObject3D('mesh');
-            mesh.material.map = tex;
-            mesh.material.needsUpdate = true;
+            plane.getObject3D('mesh').material.map = tex;
             const a = tex.image.width / tex.image.height;
             const size = 0.5;
-            if (a >= 1) { 
-                plane.setAttribute('width', size); 
-                plane.setAttribute('height', size / a); 
-            } else { 
-                plane.setAttribute('height', size); 
-                plane.setAttribute('width', size * a); 
+            if (a >= 1) {
+                plane.setAttribute('width', size);
+                plane.setAttribute('height', size / a);
+            } else {
+                plane.setAttribute('height', size);
+                plane.setAttribute('width', size * a);
             }
             plane.object3D.lookAt(pos);
         });
@@ -91,99 +86,78 @@ window.onload = () => {
     }
 
     window.addEventListener('mousedown', addPhoto);
-    window.addEventListener('touchstart', addPhoto, {passive: false});
+    window.addEventListener('touchstart', addPhoto, { passive: false });
 
-    // 4. 保存ロジック（比率修正済み）
     shotBtn.addEventListener('click', () => {
-        try {
-            const video = document.querySelector('video');
-            const glCanvas = scene.canvas;
-            if (!video || !glCanvas) return;
 
-            // 最新のAR状態をレンダリング
-            scene.renderer.render(scene.object3D, scene.camera);
+        const video = document.querySelector('video');
+        const glCanvas = scene.canvas;
+        if (!video || !glCanvas) return;
 
-            const vWidth = video.clientWidth;
-            const vHeight = video.clientHeight;
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
+        scene.renderer.render(scene.object3D, scene.camera);
 
-            const canvas = document.createElement('canvas');
-            canvas.width = vWidth;
-            canvas.height = vHeight;
-            const ctx = canvas.getContext('2d');
+        const vWidth = video.clientWidth;
+        const vHeight = video.clientHeight;
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
 
-            // --- 4a. ビデオ背景の比率計算 (object-fit: cover を再現) ---
-            const videoAspect = vw / vh;
-            const screenAspect = vWidth / vHeight;
-            let sx, sy, sWidth, sHeight;
+        const canvas = document.createElement('canvas');
+        canvas.width = vWidth;
+        canvas.height = vHeight;
+        const ctx = canvas.getContext('2d');
 
-            if (videoAspect > screenAspect) {
-                sWidth = vh * screenAspect;
-                sHeight = vh;
-                sx = (vw - sWidth) / 2;
-                sy = 0;
-            } else {
-                sWidth = vw;
-                sHeight = vw / screenAspect;
-                sx = 0;
-                sy = (vh - sHeight) / 2;
-            }
+        const videoAspect = vw / vh;
+        const screenAspect = vWidth / vHeight;
 
-            // カメラ背景を描画
-            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, vWidth, vHeight);
-            
-            // --- 4b. ARレイヤーの比率計算 (つぶれ防止のクロップ処理) ---
-            const cw = glCanvas.width;
-            const ch = glCanvas.height;
-            const canvasAspect = cw / ch;
-            
-            let csx, csy, csWidth, csHeight;
+        let sx, sy, sw, sh;
 
-            // Canvasの解像度から、画面比率に合う部分だけを切り出す
-            if (canvasAspect > screenAspect) {
-                csWidth = ch * screenAspect;
-                csHeight = ch;
-                csx = (cw - csWidth) / 2;
-                csy = 0;
-            } else {
-                csWidth = cw;
-                csHeight = cw / screenAspect;
-                csx = 0;
-                csy = (ch - csHeight) / 2;
-            }
-
-            // AR内容を合成
-            ctx.drawImage(glCanvas, csx, csy, csWidth, csHeight, 0, 0, vWidth, vHeight);
-
-            const url = canvas.toDataURL('image/png');
-            saveImage(url);
-
-        } catch (e) {
-            console.error("Capture failed:", e);
+        if (videoAspect > screenAspect) {
+            sh = vh;
+            sw = vh * screenAspect;
+            sx = (vw - sw) / 2;
+            sy = 0;
+        } else {
+            sw = vw;
+            sh = vw / screenAspect;
+            sx = 0;
+            sy = (vh - sh) / 2;
         }
+
+        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, vWidth, vHeight);
+
+        // ⭐ここが最大修正ポイント⭐
+        const cw = glCanvas.clientWidth;
+        const ch = glCanvas.clientHeight;
+        const dpr = window.devicePixelRatio || 1;
+
+        let csx = 0, csy = 0, csw = cw, csh = ch;
+
+        ctx.drawImage(
+            glCanvas,
+            csx * dpr,
+            csy * dpr,
+            csw * dpr,
+            csh * dpr,
+            0,
+            0,
+            vWidth,
+            vHeight
+        );
+
+        saveImage(canvas.toDataURL('image/png'));
     });
 
-    // 5. 保存・共有用関数
     async function saveImage(url) {
-        // フラッシュエフェクト
+
         const f = document.createElement('div');
-        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
+        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;';
         document.body.appendChild(f);
-        setTimeout(() => { 
-            f.style.transition='opacity .4s'; 
-            f.style.opacity=0; 
-            setTimeout(()=>f.remove(), 400); 
-        }, 50);
+        setTimeout(() => f.remove(), 300);
 
         if (navigator.share) {
-            try {
-                const blob = await (await fetch(url)).blob();
-                const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
-                await navigator.share({ files: [file] });
-            } catch (e) {
-                // キャンセル時は何もしない
-            }
+            const blob = await (await fetch(url)).blob();
+            const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
+            navigator.share({ files: [file] });
         } else {
             const a = document.createElement('a');
             a.href = url;
