@@ -75,8 +75,13 @@ window.onload = () => {
             mesh.material.needsUpdate = true;
             const a = tex.image.width / tex.image.height;
             const size = 0.5;
-            if (a >= 1) { plane.setAttribute('width', size); plane.setAttribute('height', size / a); }
-            else { plane.setAttribute('height', size); plane.setAttribute('width', size * a); }
+            if (a >= 1) { 
+                plane.setAttribute('width', size); 
+                plane.setAttribute('height', size / a); 
+            } else { 
+                plane.setAttribute('height', size); 
+                plane.setAttribute('width', size * a); 
+            }
             plane.object3D.lookAt(pos);
         });
 
@@ -95,6 +100,7 @@ window.onload = () => {
             const glCanvas = scene.canvas;
             if (!video || !glCanvas) return;
 
+            // 最新のAR状態をレンダリング
             scene.renderer.render(scene.object3D, scene.camera);
 
             const vWidth = video.clientWidth;
@@ -107,7 +113,7 @@ window.onload = () => {
             canvas.height = vHeight;
             const ctx = canvas.getContext('2d');
 
-            // --- 比率計算 (object-fit: cover を再現) ---
+            // --- 4a. ビデオ背景の比率計算 (object-fit: cover を再現) ---
             const videoAspect = vw / vh;
             const screenAspect = vWidth / vHeight;
             let sx, sy, sWidth, sHeight;
@@ -124,11 +130,31 @@ window.onload = () => {
                 sy = (vh - sHeight) / 2;
             }
 
-            // カメラ背景：sx, sy を使って中央切り抜き
+            // カメラ背景を描画
             ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, vWidth, vHeight);
             
-            // AR：表示サイズでそのまま合成
-            ctx.drawImage(glCanvas, 0, 0, vWidth, vHeight);
+            // --- 4b. ARレイヤーの比率計算 (つぶれ防止のクロップ処理) ---
+            const cw = glCanvas.width;
+            const ch = glCanvas.height;
+            const canvasAspect = cw / ch;
+            
+            let csx, csy, csWidth, csHeight;
+
+            // Canvasの解像度から、画面比率に合う部分だけを切り出す
+            if (canvasAspect > screenAspect) {
+                csWidth = ch * screenAspect;
+                csHeight = ch;
+                csx = (cw - csWidth) / 2;
+                csy = 0;
+            } else {
+                csWidth = cw;
+                csHeight = cw / screenAspect;
+                csx = 0;
+                csy = (ch - csHeight) / 2;
+            }
+
+            // AR内容を合成
+            ctx.drawImage(glCanvas, csx, csy, csWidth, csHeight, 0, 0, vWidth, vHeight);
 
             const url = canvas.toDataURL('image/png');
             saveImage(url);
@@ -138,12 +164,17 @@ window.onload = () => {
         }
     });
 
-    // 保存用関数 (shotBtnと同じスコープに配置)
+    // 5. 保存・共有用関数
     async function saveImage(url) {
+        // フラッシュエフェクト
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);
-        setTimeout(() => { f.style.transition='opacity .4s'; f.style.opacity=0; setTimeout(()=>f.remove(),400); }, 50);
+        setTimeout(() => { 
+            f.style.transition='opacity .4s'; 
+            f.style.opacity=0; 
+            setTimeout(()=>f.remove(), 400); 
+        }, 50);
 
         if (navigator.share) {
             try {
@@ -151,7 +182,7 @@ window.onload = () => {
                 const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
                 await navigator.share({ files: [file] });
             } catch (e) {
-                // キャンセル時
+                // キャンセル時は何もしない
             }
         } else {
             const a = document.createElement('a');
@@ -160,5 +191,4 @@ window.onload = () => {
             a.click();
         }
     }
-
-}; 
+};
