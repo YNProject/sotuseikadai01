@@ -89,55 +89,49 @@ window.onload = () => {
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
     // 4. 【決定版】横伸び・横潰れを修正した保存ロジック
+// 4. 【修正版】解像度と比率を完全に維持する保存ロジック
     shotBtn.addEventListener('click', () => {
         try {
             const video = document.querySelector('video');
             const glCanvas = scene.canvas;
 
-            // 再描画を強制して最新状態をCanvasに送る
+            // A-Frameのレンダラーで最新状態を確定させる
             scene.renderer.render(scene.object3D, scene.camera);
 
-            // 【ここがポイント】
-            // window.innerWidthではなく、ビデオ要素が実際に画面を占めているサイズ(CSS)を基準にする
-            const vWidth = video.clientWidth;
-            const vHeight = video.clientHeight;
-
-            // ビデオの元データ解像度
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
-
-            // 保存用のキャンバス。
-            // 縦横比を「プレビューで見ているビデオの比率」に完全に合わせる
+            // 【重要】保存用キャンバスのサイズを、AR描画側の実解像度に合わせる
             const canvas = document.createElement('canvas');
-            canvas.width = vWidth;
-            canvas.height = vHeight;
+            canvas.width = glCanvas.width;
+            canvas.height = glCanvas.height;
             const ctx = canvas.getContext('2d');
 
-            // クロップ計算（Cover設定）
-            const videoAspect = vw / vh;
-            const screenAspect = vWidth / vHeight;
-            let sx, sy, sWidth, sHeight;
+            // ビデオの元データ解像度と、ARキャンバスの比率
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            const targetAspect = canvas.width / canvas.height;
 
-            if (videoAspect > screenAspect) {
-                // ビデオの方が横長（左右を削る）
-                sWidth = vh * screenAspect;
+            // ビデオをキャンバス（ARの比率）に合わせてクロップ（Cover）描画する計算
+            let sx, sy, sWidth, sHeight;
+            const videoAspect = vw / vh;
+
+            if (videoAspect > targetAspect) {
+                // ビデオが横長すぎる場合：左右をカット
+                sWidth = vh * targetAspect;
                 sHeight = vh;
                 sx = (vw - sWidth) / 2;
                 sy = 0;
             } else {
-                // ビデオの方が縦長（上下を削る）
+                // ビデオが縦長すぎる場合：上下をカット
                 sWidth = vw;
-                sHeight = vw / screenAspect;
+                sHeight = vw / targetAspect;
                 sx = 0;
                 sy = (vh - sHeight) / 2;
             }
 
-            // 背景（カメラ）を描画
-            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, vWidth, vHeight);
+            // 1. 背景カメラ映像を描画
+            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
             
-            // AR（ラーメンなど）を描画
-            // 画面サイズ(vWidth, vHeight)に引き伸ばしてピッタリ重ねる
-            ctx.drawImage(glCanvas, 0, 0, vWidth, vHeight);
+            // 2. AR（写真）を描画（サイズが一致しているのでそのまま重ねる）
+            ctx.drawImage(glCanvas, 0, 0, canvas.width, canvas.height);
 
             const url = canvas.toDataURL('image/png');
             saveImage(url);
@@ -146,26 +140,4 @@ window.onload = () => {
             console.error("Capture failed:", e);
         }
     });
-
-    async function saveImage(url) {
-        const f = document.createElement('div');
-        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
-        document.body.appendChild(f);
-        setTimeout(() => { f.style.transition='opacity .4s'; f.style.opacity=0; setTimeout(()=>f.remove(),400); }, 50);
-
-        if (navigator.share) {
-            try {
-                const blob = await (await fetch(url)).blob();
-                const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
-                await navigator.share({ files: [file] });
-            } catch (e) {
-                // キャンセル時などは何もしない
-            }
-        } else {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `ar-${Date.now()}.png`;
-            a.click();
-        }
-    }
 };
