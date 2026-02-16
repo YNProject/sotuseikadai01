@@ -89,76 +89,72 @@ window.onload = () => {
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
     // 4. 保存ロジック（比率修正済み）
-    shotBtn.addEventListener('click', () => {
-        try {
-            const video = document.querySelector('video');
-            const glCanvas = scene.canvas;
-            if (!video || !glCanvas) return;
+// 4. 保存ロジック（比率修正済み）
+shotBtn.addEventListener('click', () => {
+    try {
+        const video = document.querySelector('video');
+        const glCanvas = scene.canvas;
+        if (!video || !glCanvas) return;
 
-            scene.renderer.render(scene.object3D, scene.camera);
+        // 最新の状態をレンダリング
+        scene.renderer.render(scene.object3D, scene.camera);
 
-            const vWidth = video.clientWidth;
-            const vHeight = video.clientHeight;
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
+        const vWidth = video.clientWidth;
+        const vHeight = video.clientHeight;
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
 
-            const canvas = document.createElement('canvas');
-            canvas.width = vWidth;
-            canvas.height = vHeight;
-            const ctx = canvas.getContext('2d');
+        const canvas = document.createElement('canvas');
+        canvas.width = vWidth;
+        canvas.height = vHeight;
+        const ctx = canvas.getContext('2d');
 
-            // --- 比率計算 (object-fit: cover を再現) ---
-            const videoAspect = vw / vh;
-            const screenAspect = vWidth / vHeight;
-            let sx, sy, sWidth, sHeight;
+        // --- ビデオ背景の計算 (object-fit: cover を再現) ---
+        const videoAspect = vw / vh;
+        const screenAspect = vWidth / vHeight;
+        let sx, sy, sWidth, sHeight;
 
-            if (videoAspect > screenAspect) {
-                sWidth = vh * screenAspect;
-                sHeight = vh;
-                sx = (vw - sWidth) / 2;
-                sy = 0;
-            } else {
-                sWidth = vw;
-                sHeight = vw / screenAspect;
-                sx = 0;
-                sy = (vh - sHeight) / 2;
-            }
-
-            // カメラ背景：sx, sy を使って中央切り抜き
-            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, vWidth, vHeight);
-            
-            // AR：表示サイズでそのまま合成
-            ctx.drawImage(glCanvas, 0, 0, vWidth, vHeight);
-
-            const url = canvas.toDataURL('image/png');
-            saveImage(url);
-
-        } catch (e) {
-            console.error("Capture failed:", e);
-        }
-    });
-
-    // 保存用関数 (shotBtnと同じスコープに配置)
-    async function saveImage(url) {
-        const f = document.createElement('div');
-        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
-        document.body.appendChild(f);
-        setTimeout(() => { f.style.transition='opacity .4s'; f.style.opacity=0; setTimeout(()=>f.remove(),400); }, 50);
-
-        if (navigator.share) {
-            try {
-                const blob = await (await fetch(url)).blob();
-                const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
-                await navigator.share({ files: [file] });
-            } catch (e) {
-                // キャンセル時
-            }
+        if (videoAspect > screenAspect) {
+            sWidth = vh * screenAspect;
+            sHeight = vh;
+            sx = (vw - sWidth) / 2;
+            sy = 0;
         } else {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `ar-${Date.now()}.png`;
-            a.click();
+            sWidth = vw;
+            sHeight = vw / screenAspect;
+            sx = 0;
+            sy = (vh - sHeight) / 2;
         }
-    }
 
+        // 1. カメラ背景を描画
+        ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, vWidth, vHeight);
+        
+        // 2. ARレイヤー（Canvas）を「アスペクト比を維持して中央切り抜き」で合成
+        // ★ここが修正ポイント★
+        const cw = glCanvas.width;
+        const ch = glCanvas.height;
+        const canvasAspect = cw / ch;
+
+        let csx, csy, csWidth, csHeight;
+        if (canvasAspect > screenAspect) {
+            csWidth = ch * screenAspect;
+            csHeight = ch;
+            csx = (cw - csWidth) / 2;
+            csy = 0;
+        } else {
+            csWidth = cw;
+            csHeight = cw / screenAspect;
+            csx = 0;
+            csy = (ch - csHeight) / 2;
+        }
+
+        ctx.drawImage(glCanvas, csx, csy, csWidth, csHeight, 0, 0, vWidth, vHeight);
+
+        const url = canvas.toDataURL('image/png');
+        saveImage(url);
+
+    } catch (e) {
+        console.error("Capture failed:", e);
+    }
+});
 }; // ここで全て閉じる (成功コードと同じ構造)
