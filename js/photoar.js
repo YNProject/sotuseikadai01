@@ -88,55 +88,46 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
-    // 4. 【決定版】横伸び・横潰れを修正した保存ロジック
+    // 4. 保存ロジック（比率修正済み）
     shotBtn.addEventListener('click', () => {
         try {
             const video = document.querySelector('video');
             const glCanvas = scene.canvas;
+            if (!video || !glCanvas) return;
 
-            // 再描画を強制して最新状態をCanvasに送る
             scene.renderer.render(scene.object3D, scene.camera);
 
-            // 【ここがポイント】
-            // window.innerWidthではなく、ビデオ要素が実際に画面を占めているサイズ(CSS)を基準にする
             const vWidth = video.clientWidth;
             const vHeight = video.clientHeight;
-
-            // ビデオの元データ解像度
             const vw = video.videoWidth;
             const vh = video.videoHeight;
 
-            // 保存用のキャンバス。
-            // 縦横比を「プレビューで見ているビデオの比率」に完全に合わせる
             const canvas = document.createElement('canvas');
             canvas.width = vWidth;
             canvas.height = vHeight;
             const ctx = canvas.getContext('2d');
 
-            // クロップ計算（Cover設定）
+            // --- 比率計算 (object-fit: cover を再現) ---
             const videoAspect = vw / vh;
             const screenAspect = vWidth / vHeight;
             let sx, sy, sWidth, sHeight;
 
             if (videoAspect > screenAspect) {
-                // ビデオの方が横長（左右を削る）
                 sWidth = vh * screenAspect;
                 sHeight = vh;
                 sx = (vw - sWidth) / 2;
                 sy = 0;
             } else {
-                // ビデオの方が縦長（上下を削る）
                 sWidth = vw;
                 sHeight = vw / screenAspect;
                 sx = 0;
                 sy = (vh - sHeight) / 2;
             }
 
-            // 背景（カメラ）を描画
+            // カメラ背景：sx, sy を使って中央切り抜き
             ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, vWidth, vHeight);
             
-            // AR（ラーメンなど）を描画
-            // 画面サイズ(vWidth, vHeight)に引き伸ばしてピッタリ重ねる
+            // AR：表示サイズでそのまま合成
             ctx.drawImage(glCanvas, 0, 0, vWidth, vHeight);
 
             const url = canvas.toDataURL('image/png');
@@ -147,6 +138,7 @@ window.onload = () => {
         }
     });
 
+    // 保存用関数 (shotBtnと同じスコープに配置)
     async function saveImage(url) {
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
@@ -159,7 +151,7 @@ window.onload = () => {
                 const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
                 await navigator.share({ files: [file] });
             } catch (e) {
-                // キャンセル時などは何もしない
+                // キャンセル時
             }
         } else {
             const a = document.createElement('a');
@@ -169,4 +161,4 @@ window.onload = () => {
         }
     }
 
-};
+}; // ここで全て閉じる (成功コードと同じ構造)
