@@ -8,12 +8,14 @@ window.onload = () => {
     let selectedImgUrl = null;
     let selectedAspect = 1;
 
-    // スタート画面タップでAR起動（これが最も確実にカメラが動く方法です）
+    // 1. 開始処理：即座にWebXR(AR)を開始
     startScreen.addEventListener('click', () => {
-        scene.enterVR(); 
+        // A-FrameのXRセッションを「AR」として開始
+        scene.enterVR(); // WebXRではこのメソッドがAR起動を兼ねます
         startScreen.style.display = 'none';
     });
 
+    // 2. 画像選択（変更なし）
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -22,15 +24,10 @@ window.onload = () => {
             const img = new Image();
             img.onload = () => {
                 const c = document.createElement('canvas');
-                const max = 1024;
-                let w = img.width, h = img.height;
-                if (w > h && w > max) { h *= max / w; w = max; }
-                else if (h > max) { w *= max / h; h = max; }
-                c.width = w; c.height = h;
-                const ctx = c.getContext('2d');
-                ctx.drawImage(img, 0, 0, w, h);
+                c.width = img.width; c.height = img.height;
+                c.getContext('2d').drawImage(img, 0, 0);
                 selectedImgUrl = c.toDataURL('image/jpeg', 0.8);
-                selectedAspect = w / h;
+                selectedAspect = img.width / img.height;
                 fileLabel.innerText = "✅ 空間をタップ！";
                 fileLabel.style.background = "#2e7d32";
             };
@@ -39,46 +36,45 @@ window.onload = () => {
         reader.readAsDataURL(file);
     });
 
+    // 3. 配置処理
     scene.addEventListener('click', (e) => {
-        // ボタン類を触っている時は配置しない
-        if (!selectedImgUrl || e.target.closest('.button-row')) return;
+        if (!selectedImgUrl || e.target.closest('.ui-btn')) return;
 
         const camObj = document.getElementById('myCamera').object3D;
         const pos = new THREE.Vector3();
         const dir = new THREE.Vector3();
         
+        // カメラの正確な位置を算出
         camObj.getWorldPosition(pos);
         camObj.getWorldDirection(dir);
 
         const plane = document.createElement('a-plane');
         
-        // 1.5m先の座標を計算（WebXRの6DOF空間）
-        const dist = 1.5;
-        const targetPos = {
+        // 1.2m先に固定
+        const dist = 1.2;
+        const planePos = {
             x: pos.x - dir.x * dist,
-            y: pos.y - dir.y * dist, // 高さをカメラ位置に合わせる
+            y: pos.y - dir.y * dist,
             z: pos.z - dir.z * dist
         };
 
-        plane.setAttribute('position', targetPos);
-        plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
+        plane.setAttribute('position', planePos);
+        plane.setAttribute('material', 'shader:flat;side:double;transparent:true;src:' + selectedImgUrl);
         
-        // 写真がこちらを向くように設定
-        plane.object3D.lookAt(new THREE.Vector3(pos.x, targetPos.y, pos.z));
+        // 写真を直立させ、自分の方を向かせる
+        plane.object3D.lookAt(new THREE.Vector3(pos.x, planePos.y, pos.z));
 
-        new THREE.TextureLoader().load(selectedImgUrl, tex => {
-            plane.getObject3D('mesh').material.map = tex;
-            const size = 0.6;
-            if (selectedAspect >= 1) {
-                plane.setAttribute('width', size);
-                plane.setAttribute('height', size / selectedAspect);
-            } else {
-                plane.setAttribute('height', size);
-                plane.setAttribute('width', size * selectedAspect);
-            }
-        });
+        const size = 0.5;
+        if (selectedAspect >= 1) {
+            plane.setAttribute('width', size);
+            plane.setAttribute('height', size / selectedAspect);
+        } else {
+            plane.setAttribute('height', size);
+            plane.setAttribute('width', size * selectedAspect);
+        }
 
         arWorld.appendChild(plane);
+
         selectedImgUrl = null;
         fileLabel.innerText = "① 写真を選ぶ";
         fileLabel.style.background = "rgba(0,0,0,0.8)";
