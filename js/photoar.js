@@ -34,7 +34,8 @@ window.onload = () => {
                 if (w > h && w > max) { h *= max / w; w = max; }
                 else if (h > max) { w *= max / h; h = max; }
                 c.width = w; c.height = h;
-                c.getContext('2d').drawImage(img, 0, 0, w, h);
+                const ctx = c.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
                 selectedImgUrl = c.toDataURL('image/jpeg', 0.9);
                 canPlace = true;
                 fileLabel.innerText = "✅ 画面をタップ！";
@@ -50,12 +51,12 @@ window.onload = () => {
         if (!appStarted || e.target.closest('.ui-container')) return;
         if (!selectedImgUrl || !canPlace) return;
 
-        const cam = document.getElementById('myCamera').object3D;
+        const camObj = document.getElementById('myCamera').object3D;
         const pos = new THREE.Vector3();
         const dir = new THREE.Vector3();
 
-        cam.getWorldPosition(pos);
-        cam.getWorldDirection(dir);
+        camObj.getWorldPosition(pos);
+        camObj.getWorldDirection(dir);
 
         const plane = document.createElement('a-plane');
         plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
@@ -87,24 +88,26 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
-    // 【重要】見たまま保存ロジック
-    shotBtn.addEventListener('click', async () => {
+    // 【修正版】真っ暗にならない保存ロジック
+    shotBtn.addEventListener('click', () => {
         try {
             const video = document.querySelector('video');
-            const glCanvas = scene.components.screenshot.getCanvas('perspective');
+            const glCanvas = scene.canvas; // scene.components.screenshotを使わず直接Canvasを取得
+
+            // A-Frameに現在のフレームを強制描画（真っ黒回避）
+            scene.renderer.render(scene.object3D, scene.camera);
 
             const vw = video.videoWidth;
             const vh = video.videoHeight;
             const sw = window.innerWidth;
             const sh = window.innerHeight;
 
-            // 1. 保存用Canvasを「画面の表示サイズ」で作る
             const canvas = document.createElement('canvas');
             canvas.width = sw;
             canvas.height = sh;
             const ctx = canvas.getContext('2d');
 
-            // 2. カメラの「画面で見えている範囲」を計算して切り抜く
+            // 1. カメラ映像のクロップ計算
             const videoAspect = vw / vh;
             const screenAspect = sw / sh;
             let sx, sy, sWidth, sHeight;
@@ -117,27 +120,33 @@ window.onload = () => {
                 sx = 0; sy = (vh - sHeight) / 2;
             }
 
-            // カメラ描画
+            // カメラを描画
             ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, sw, sh);
-            // AR描画
+            // ARを描画 (scene.canvasをそのまま使用)
             ctx.drawImage(glCanvas, 0, 0, sw, sh);
 
             const url = canvas.toDataURL('image/png');
             
-            // フラッシュ演出
-            const f = document.createElement('div');
-            f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
-            document.body.appendChild(f);
-            setTimeout(() => { f.style.transition='opacity .4s'; f.style.opacity=0; setTimeout(()=>f.remove(),400); }, 50);
+            // 保存・共有
+            saveImage(url);
 
-            if (navigator.share) {
-                const blob = await (await fetch(url)).blob();
-                const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
-                await navigator.share({ files: [file] }).catch(() => {});
-            } else {
-                const a = document.createElement('a');
-                a.href = url; a.download = `ar-${Date.now()}.png`; a.click();
-            }
         } catch (e) { console.error(e); }
     });
+
+    async function saveImage(url) {
+        // フラッシュ演出
+        const f = document.createElement('div');
+        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
+        document.body.appendChild(f);
+        setTimeout(() => { f.style.transition='opacity .4s'; f.style.opacity=0; setTimeout(()=>f.remove(),400); }, 50);
+
+        if (navigator.share) {
+            const blob = await (await fetch(url)).blob();
+            const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
+            await navigator.share({ files: [file] }).catch(() => {});
+        } else {
+            const a = document.createElement('a');
+            a.href = url; a.download = `ar-${Date.now()}.png`; a.click();
+        }
+    }
 };
