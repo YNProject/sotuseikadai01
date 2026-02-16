@@ -1,4 +1,4 @@
-window.onload = () => {
+document.addEventListener("DOMContentLoaded", () => {
 
     const scene = document.querySelector('a-scene');
     const fileInput = document.getElementById('fileInput');
@@ -186,4 +186,4 @@ window.onload = () => {
             console.error(err);
         }
     });
-};
+});
