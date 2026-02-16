@@ -11,7 +11,6 @@ window.onload = () => {
     let canPlace = false;
     let appStarted = false;
 
-    // 1. スタート画面
     startScreen.addEventListener('click', () => {
         startScreen.style.opacity = '0';
         setTimeout(() => {
@@ -21,7 +20,6 @@ window.onload = () => {
         }, 400);
     });
 
-    // 2. 写真の読み込み
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -48,7 +46,6 @@ window.onload = () => {
         reader.readAsDataURL(file);
     });
 
-    // 3. AR平面の配置
     function addPhoto(e) {
         if (!appStarted || e.target.closest('.ui-container')) return;
         if (!selectedImgUrl || !canPlace) return;
@@ -83,7 +80,6 @@ window.onload = () => {
             }
             plane.object3D.lookAt(pos);
         });
-
         canPlace = false;
         fileLabel.innerText = "① 写真を選ぶ";
         fileLabel.style.background = "rgba(0,0,0,.8)";
@@ -91,58 +87,67 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, { passive: false });
 
-    // 4. 【決定版】保存ロジック：見たままキャプチャ
+    // --- 保存ロジック：座標と比率を物理的に一致させる ---
     shotBtn.addEventListener('click', async () => {
         try {
             const video = document.querySelector('video');
             const glCanvas = scene.canvas;
             if (!video || !glCanvas) return;
 
-            // 画面の「見た目」のサイズ（CSSピクセル）でキャンバスを作成
-            const outWidth = window.innerWidth;
-            const outHeight = window.innerHeight;
-
+            // 1. 保存用キャンバスを「スマホ画面の見た目そのまま」のサイズで作成
             const canvas = document.createElement('canvas');
-            canvas.width = outWidth;
-            canvas.height = outHeight;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
             const ctx = canvas.getContext('2d');
 
-            // --- 1. ビデオ（背景）を「今の見た目」に切り抜いて描画 ---
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
-            const videoAspect = vw / vh;
-            const screenAspect = outWidth / outHeight;
-
-            let sx, sy, sWidth, sHeight;
-            if (videoAspect > screenAspect) {
-                sWidth = vh * screenAspect;
-                sHeight = vh;
-                sx = (vw - sWidth) / 2;
+            // 2. ビデオ背景を描画（表示領域に合わせて中央を切り抜く）
+            const vAspect = video.videoWidth / video.videoHeight;
+            const sAspect = canvas.width / canvas.height;
+            let sx, sy, sw, sh;
+            if (vAspect > sAspect) {
+                sw = video.videoHeight * sAspect;
+                sh = video.videoHeight;
+                sx = (video.videoWidth - sw) / 2;
                 sy = 0;
             } else {
-                sWidth = vw;
-                sHeight = vw / screenAspect;
+                sw = video.videoWidth;
+                sh = video.videoWidth / sAspect;
                 sx = 0;
-                sy = (vh - sHeight) / 2;
+                sy = (video.videoHeight - sh) / 2;
             }
-            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, outWidth, outHeight);
+            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
 
-            // --- 2. AR（glCanvas）を「今の見た目」にリサイズして重ねる ---
+            // 3. ARレイヤーを描画
             scene.renderer.render(scene.object3D, scene.camera);
-            // ここで引数にoutWidth, outHeightを指定することで歪みを強制補正
-            ctx.drawImage(glCanvas, 0, 0, outWidth, outHeight);
 
-            // --- 3. 軽量なJPEGで保存 ---
+            // 【重要】glCanvasの「画面に映っている部分だけ」を切り出す計算
+            // glCanvasはAR.jsによってビデオサイズ（例: 1280x720）になっているため
+            const cw = glCanvas.width;
+            const ch = glCanvas.height;
+            const cAspect = cw / ch;
+            
+            let sourceX, sourceY, sourceW, sourceH;
+            if (cAspect > sAspect) {
+                sourceW = ch * sAspect;
+                sourceH = ch;
+                sourceX = (cw - sourceW) / 2;
+                sourceY = 0;
+            } else {
+                sourceW = cw;
+                sourceH = cw / sAspect;
+                sourceX = 0;
+                sourceY = (ch - sourceH) / 2;
+            }
+
+            // 見えている範囲だけをコピーして重ねる（これで白枠と歪みが消えます）
+            ctx.drawImage(glCanvas, sourceX, sourceY, sourceW, sourceH, 0, 0, canvas.width, canvas.height);
+
             const url = canvas.toDataURL('image/jpeg', 0.8);
             saveImage(url);
-
-        } catch (e) {
-            console.error("Capture failed:", e);
-        }
+        } catch (e) { console.error(e); }
     });
 
     async function saveImage(url) {
-        // フラッシュ演出
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);
@@ -151,16 +156,13 @@ window.onload = () => {
             f.style.opacity = 0;
             setTimeout(() => f.remove(), 400);
         }, 50);
-
+        const blob = await (await fetch(url)).blob();
+        const file = new File([blob], `ar-${Date.now()}.jpg`, { type: 'image/jpeg' });
         if (navigator.share) {
-            try {
-                const blob = await (await fetch(url)).blob();
-                const file = new File([blob], `ar-${Date.now()}.jpg`, { type: 'image/jpeg' });
-                await navigator.share({ files: [file] });
-            } catch (e) {}
+            try { await navigator.share({ files: [file] }); } catch (e) {}
         } else {
             const a = document.createElement('a');
-            a.href = url; a.download = `ar-${Date.now()}.jpg`; a.click();
+            a.href = url; a.download = file.name; a.click();
         }
     }
 };
