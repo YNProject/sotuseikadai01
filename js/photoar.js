@@ -133,71 +133,73 @@ window.addEventListener('touchstart',addPhoto);
 // ----------------
 // capture (NO distortion)
 // ----------------
-shotBtn.addEventListener('click', async ()=>{
+shotBtn.addEventListener('click', async () => {
+    try {
+        const video = document.querySelector('video');
+        // A-Frameのスクリーンショット用コンポーネントからCanvasを取得
+        const glCanvas = scene.components.screenshot.getCanvas('perspective');
 
-try{
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
 
-const video = document.querySelector('video');
-const glCanvas = scene.components.screenshot.getCanvas('perspective');
+        const canvas = document.createElement('canvas');
+        canvas.width = vw;
+        canvas.height = vh;
+        const ctx = canvas.getContext('2d');
 
-const vw = video.videoWidth;
-const vh = video.videoHeight;
+        // 1. まずカメラ映像をフルサイズで描画
+        ctx.drawImage(video, 0, 0, vw, vh);
 
-const gw = glCanvas.width;
-const gh = glCanvas.height;
+        // 2. AR側のCanvas（glCanvas）をカメラの比率に合わせて計算
+        const vAspect = vw / vh;
+        const gAspect = glCanvas.width / glCanvas.height;
 
-const canvas = document.createElement('canvas');
-canvas.width = vw;
-canvas.height = vh;
+        let sWidth, sHeight, sx, sy;
 
-const ctx = canvas.getContext('2d');
+        if (gAspect > vAspect) {
+            // AR側が横長すぎる場合、左右をカット
+            sHeight = glCanvas.height;
+            sWidth = glCanvas.height * vAspect;
+            sx = (glCanvas.width - sWidth) / 2;
+            sy = 0;
+        } else {
+            // AR側が縦長すぎる場合、上下をカット
+            sWidth = glCanvas.width;
+            sHeight = glCanvas.width / vAspect;
+            sx = 0;
+            sy = (glCanvas.height - sHeight) / 2;
+        }
 
-// camera
-ctx.drawImage(video,0,0,vw,vh);
+        // 3. glCanvasの「正しい比率の部分」だけを抜き出して、カメラと同じサイズで重ねる
+        ctx.drawImage(glCanvas, sx, sy, sWidth, sHeight, 0, 0, vw, vh);
 
-// AR合成
-const vAspect = vw / vh;
-const gAspect = gw / gh;
+        // --- 以下、保存・共有処理 ---
+        const url = canvas.toDataURL('image/png');
 
-let drawW, drawH, ox, oy;
+        // フラッシュ演出
+        const f = document.createElement('div');
+        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
+        document.body.appendChild(f);
+        setTimeout(() => {
+            f.style.transition = 'opacity 0.4s';
+            f.style.opacity = 0;
+            setTimeout(() => f.remove(), 400);
+        }, 50);
 
-if(gAspect > vAspect){
-drawH = vh;
-drawW = vh * gAspect;
-ox = (vw - drawW)/2;
-oy = 0;
-}else{
-drawW = vw;
-drawH = vw / gAspect;
-ox = 0;
-oy = (vh - drawH)/2;
-}
+        if (navigator.share) {
+            const blob = await (await fetch(url)).blob();
+            const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
+            await navigator.share({ files: [file] }).catch(() => {});
+        } else {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ar-${Date.now()}.png`;
+            a.click();
+        }
 
-ctx.drawImage(glCanvas,ox,oy,drawW,drawH);
-
-// export
-const url = canvas.toDataURL('image/png');
-
-// flash
-const f=document.createElement('div');
-f.style.cssText='position:fixed;inset:0;background:white;z-index:9999';
-document.body.appendChild(f);
-setTimeout(()=>{f.style.opacity=0;setTimeout(()=>f.remove(),400)},50);
-
-if(navigator.share){
-const blob = await(await fetch(url)).blob();
-const file = new File([blob],`ar-${Date.now()}.png`,{type:'image/png'});
-await navigator.share({files:[file]}).catch(()=>{});
-}else{
-const a=document.createElement('a');
-a.href=url;
-a.download=`ar-${Date.now()}.png`;
-a.click();
-}
-
-}catch(e){console.error(e);}
-
+    } catch (e) {
+        console.error("Capture Error:", e);
+    }
 });
-
 
 };
