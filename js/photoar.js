@@ -169,4 +169,15 @@ shotBtn.addEventListener('click', async () => {
             a.click();
         }
     }
+
+    scene.addEventListener('loaded', () => {
+    const renderer = scene.renderer;
+    const canvas = scene.canvas;
+    if (renderer && canvas) {
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        renderer.setSize(width, height, false);
+    }
+});
+
 };
