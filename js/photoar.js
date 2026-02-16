@@ -124,66 +124,61 @@ window.onload = () => {
     // 撮影処理（比率完全保持版）
     shotBtn.addEventListener('click', async () => {
 
-        try {
+    try {
 
-            const video = document.querySelector('video');
-            const sceneCanvas = scene.components.screenshot.getCanvas('perspective');
+        const video = document.querySelector('video');
+        const sceneCanvas = scene.components.screenshot.getCanvas('perspective');
 
-            const finalCanvas = document.createElement("canvas");
-            finalCanvas.width = video.videoWidth;
-            finalCanvas.height = video.videoHeight;
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
 
-            const ctx = finalCanvas.getContext("2d");
+        const finalCanvas = document.createElement("canvas");
+        finalCanvas.width = vw;
+        finalCanvas.height = vh;
 
-            // カメラ映像
-            ctx.drawImage(video, 0, 0, finalCanvas.width, finalCanvas.height);
+        const ctx = finalCanvas.getContext("2d");
 
-            // 比率補正
-            const vAspect = video.videoWidth / video.videoHeight;
-            const cAspect = sceneCanvas.width / sceneCanvas.height;
+        // カメラ映像
+        ctx.drawImage(video, 0, 0, vw, vh);
 
-            let drawW, drawH, offsetX, offsetY;
+        // ===== ARキャンバスを同解像度へ正規化 =====
 
-            if (cAspect > vAspect) {
-                drawH = finalCanvas.height;
-                drawW = finalCanvas.height * cAspect;
-                offsetX = (finalCanvas.width - drawW) / 2;
-                offsetY = 0;
-            } else {
-                drawW = finalCanvas.width;
-                drawH = finalCanvas.width / cAspect;
-                offsetX = 0;
-                offsetY = (finalCanvas.height - drawH) / 2;
-            }
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = vw;
+        tempCanvas.height = vh;
 
-            ctx.drawImage(sceneCanvas, offsetX, offsetY, drawW, drawH);
+        const tctx = tempCanvas.getContext('2d');
+        tctx.drawImage(sceneCanvas, 0, 0, vw, vh);
 
-            const dataURL = finalCanvas.toDataURL('image/png');
+        // ===== 完全一致合成 =====
 
-            // フラッシュ
-            const flash = document.createElement('div');
-            flash.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:white;z-index:10001;';
-            document.body.appendChild(flash);
-            setTimeout(() => {
-                flash.style.transition = 'opacity 0.4s';
-                flash.style.opacity = '0';
-                setTimeout(() => flash.remove(), 400);
-            }, 50);
+        ctx.drawImage(tempCanvas, 0, 0, vw, vh);
 
-            if (navigator.share && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
-                const blob = await (await fetch(dataURL)).blob();
-                const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
-                await navigator.share({ files: [file] }).catch(() => {});
-            } else {
-                const link = document.createElement('a');
-                link.download = `ar-${Date.now()}.png`;
-                link.href = dataURL;
-                link.click();
-            }
+        const dataURL = finalCanvas.toDataURL('image/png');
 
-        } catch (e) {
-            console.error(e);
+        // フラッシュ
+        const flash = document.createElement('div');
+        flash.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:white;z-index:10001;';
+        document.body.appendChild(flash);
+        setTimeout(() => {
+            flash.style.transition = 'opacity 0.4s';
+            flash.style.opacity = '0';
+            setTimeout(() => flash.remove(), 400);
+        }, 50);
+
+        if (navigator.share && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
+            const blob = await (await fetch(dataURL)).blob();
+            const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
+            await navigator.share({ files: [file] }).catch(() => {});
+        } else {
+            const link = document.createElement('a');
+            link.download = `ar-${Date.now()}.png`;
+            link.href = dataURL;
+            link.click();
         }
-    });
 
+    } catch (e) {
+        console.error(e);
+    }
+    });
 };
