@@ -98,23 +98,21 @@ shotBtn.addEventListener('click', async () => {
     try {
         const video = document.querySelector('video');
         const glCanvas = scene.canvas;
-        if (!video || !glCanvas) return;
+        if (!video || !glCanvas || !selectedImgUrl) return;
 
         scene.renderer.render(scene.object3D, scene.camera);
 
         const vw = video.videoWidth;
         const vh = video.videoHeight;
-        const vClientW = video.clientWidth;
-        const vClientH = video.clientHeight;
 
         const canvas = document.createElement('canvas');
-        canvas.width = vClientW;
-        canvas.height = vClientH;
+        canvas.width = vw;
+        canvas.height = vh;
         const ctx = canvas.getContext('2d');
 
-        // --- ビデオ背景を描画 ---
+        // --- ビデオ背景を描画（object-fit: cover 相当） ---
         const videoAspect = vw / vh;
-        const screenAspect = vClientW / vClientH;
+        const screenAspect = vw / vh;
         let sx, sy, sWidth, sHeight;
 
         if (videoAspect > screenAspect) {
@@ -131,9 +129,9 @@ shotBtn.addEventListener('click', async () => {
 
         ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
-        // --- ARレイヤーをImageBitmapとして描画 ---
+        // --- ARレイヤーを元画像の比率で描画 ---
         const bitmap = await createImageBitmap(glCanvas);
-        ctx.drawImage(bitmap, 0, 0, vClientW, vClientH);
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
         const url = canvas.toDataURL('image/png');
         saveImage(url);
