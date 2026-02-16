@@ -46,39 +46,34 @@ window.onload = () => {
         reader.readAsDataURL(file);
     });
 
-    function addPhoto(e) {
-        if (!appStarted || e.target.closest('.ui-container')) return;
-        if (!selectedImgUrl || !canPlace) return;
+function addPhoto(e) {
+    if (!appStarted || e.target.closest('.ui-container')) return;
+    if (!selectedImgUrl || !canPlace) return;
 
-        // 1. シーン（世界）を取得
-        const sceneEl = document.querySelector('a-scene');
-        const camEl = document.getElementById('myCamera');
+    const sceneEl = document.querySelector('a-scene');
+    const camEl = document.getElementById('myCamera');
 
-        // 2. カメラの「現在の世界座標」と「向いている方向」を取得
-        const worldPos = new THREE.Vector3();
-        const worldDir = new THREE.Vector3();
-        camEl.object3D.getWorldPosition(worldPos);
-        camEl.object3D.getWorldDirection(worldDir);
+    // 1. カメラの現在の行列（位置・回転情報）を完全に取得
+    const camMatrix = camEl.object3D.matrixWorld;
+    
+    // 2. カメラの1.5m前方の位置を計算
+    const targetPos = new THREE.Vector3(0, 0, -1.5); 
+    targetPos.applyMatrix4(camMatrix); // カメラの向き・位置を反映した「世界の住所」に変換
 
-        // 3. 配置する絶対座標を計算（カメラの1.5m前方）
-        const dist = 1.5;
-        const targetX = worldPos.x - worldDir.x * dist;
-        const targetY = worldPos.y - worldDir.y * dist;
-        const targetZ = worldPos.z - worldDir.z * dist;
+    const plane = document.createElement('a-plane');
+    
+    // 3. 絶対座標で配置
+    plane.setAttribute('position', targetPos);
+    
+    // 4. 今の自分の方向を向かせる（が、位置はここに固定）
+    const lookAtPos = new THREE.Vector3();
+    camEl.object3D.getWorldPosition(lookAtPos);
+    plane.object3D.lookAt(lookAtPos);
+    
+    plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
 
-        // 4. 写真（a-plane）を作成
-        const plane = document.createElement('a-plane');
-
-        // 5. 重要：位置を「世界の絶対座標」に固定
-        plane.setAttribute('position', `${targetX} ${targetY} ${targetZ}`);
-
-        // 6. 配置した瞬間にだけ、カメラの方を向かせる
-        plane.object3D.lookAt(worldPos);
-
-        plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
-
-        // 7. カメラの中（appendChild(camEl)）ではなく、シーンに追加する
-        sceneEl.appendChild(plane);
+    // カメラの中ではなく、必ずシーン直下に追加
+    sceneEl.appendChild(plane);
 
         new THREE.TextureLoader().load(selectedImgUrl, tex => {
             const mesh = plane.getObject3D('mesh');
