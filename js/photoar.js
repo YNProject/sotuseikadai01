@@ -84,7 +84,7 @@ window.onload = () => {
             const mesh = plane.getObject3D('mesh');
             mesh.material.map = tex;
             mesh.material.needsUpdate = true;
-            const size = 0.8; // 少し大きめに設定
+            const size = 0.4; // 少し大きめに設定
             if (selectedAspect >= 1) {
                 plane.setAttribute('width', size);
                 plane.setAttribute('height', size / selectedAspect);
