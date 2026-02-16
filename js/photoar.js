@@ -10,6 +10,7 @@ window.onload = () => {
     let canPlace = false;
     let appStarted = false;
 
+    // 1. スタート画面制御
     startScreen.addEventListener('click', () => {
         startScreen.style.opacity = '0';
         setTimeout(() => {
@@ -19,6 +20,7 @@ window.onload = () => {
         }, 400);
     });
 
+    // 2. 画像選択・リサイズ
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -32,7 +34,8 @@ window.onload = () => {
                 if (w > h && w > max) { h *= max / w; w = max; }
                 else if (h > max) { w *= max / h; h = max; }
                 c.width = w; c.height = h;
-                c.getContext('2d').drawImage(img, 0, 0, w, h);
+                const ctx = c.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
                 selectedImgUrl = c.toDataURL('image/jpeg', 0.9);
                 canPlace = true;
                 fileLabel.innerText = "✅ 画面をタップ！";
@@ -43,6 +46,7 @@ window.onload = () => {
         reader.readAsDataURL(file);
     });
 
+    // 3. AR平面の配置
     function addPhoto(e) {
         if (!appStarted || e.target.closest('.ui-container')) return;
         if (!selectedImgUrl || !canPlace) return;
@@ -56,7 +60,6 @@ window.onload = () => {
 
         const plane = document.createElement('a-plane');
         plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
-
         const dist = 1.2;
         plane.setAttribute('position', {
             x: pos.x - dir.x * dist,
@@ -67,15 +70,17 @@ window.onload = () => {
         scene.appendChild(plane);
 
         new THREE.TextureLoader().load(selectedImgUrl, tex => {
-            plane.getObject3D('mesh').material.map = tex;
+            const mesh = plane.getObject3D('mesh');
+            mesh.material.map = tex;
+            mesh.material.needsUpdate = true;
             const a = tex.image.width / tex.image.height;
             const size = 0.5;
-            if (a >= 1) {
-                plane.setAttribute('width', size);
-                plane.setAttribute('height', size / a);
-            } else {
-                plane.setAttribute('height', size);
-                plane.setAttribute('width', size * a);
+            if (a >= 1) { 
+                plane.setAttribute('width', size); 
+                plane.setAttribute('height', size / a); 
+            } else { 
+                plane.setAttribute('height', size); 
+                plane.setAttribute('width', size * a); 
             }
             plane.object3D.lookAt(pos);
         });
@@ -86,14 +91,16 @@ window.onload = () => {
     }
 
     window.addEventListener('mousedown', addPhoto);
-    window.addEventListener('touchstart', addPhoto, { passive: false });
+    window.addEventListener('touchstart', addPhoto, {passive: false});
 
-    shotBtn.addEventListener('click', () => {
-
+// 4. 保存ロジック（ARレイヤーの比率崩れを防止）
+shotBtn.addEventListener('click', () => {
+    try {
         const video = document.querySelector('video');
         const glCanvas = scene.canvas;
         if (!video || !glCanvas) return;
 
+        // 最新のAR状態をレンダリング
         scene.renderer.render(scene.object3D, scene.camera);
 
         const vWidth = video.clientWidth;
@@ -106,58 +113,58 @@ window.onload = () => {
         canvas.height = vHeight;
         const ctx = canvas.getContext('2d');
 
+        // --- 4a. ビデオ背景の比率計算 (object-fit: cover を再現) ---
         const videoAspect = vw / vh;
         const screenAspect = vWidth / vHeight;
-
-        let sx, sy, sw, sh;
+        let sx, sy, sWidth, sHeight;
 
         if (videoAspect > screenAspect) {
-            sh = vh;
-            sw = vh * screenAspect;
-            sx = (vw - sw) / 2;
+            sWidth = vh * screenAspect;
+            sHeight = vh;
+            sx = (vw - sWidth) / 2;
             sy = 0;
         } else {
-            sw = vw;
-            sh = vw / screenAspect;
+            sWidth = vw;
+            sHeight = vw / screenAspect;
             sx = 0;
-            sy = (vh - sh) / 2;
+            sy = (vh - sHeight) / 2;
         }
 
-        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, vWidth, vHeight);
+        // カメラ背景を描画
+        ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, vWidth, vHeight);
 
-        // ⭐ここが最大修正ポイント⭐
-        const cw = glCanvas.clientWidth;
-        const ch = glCanvas.clientHeight;
-        const dpr = window.devicePixelRatio || 1;
+        // --- 4b. ARレイヤーをそのまま描画（比率を保つ） ---
+        ctx.drawImage(glCanvas, 0, 0, vWidth, vHeight);
 
-        let csx = 0, csy = 0, csw = cw, csh = ch;
+        const url = canvas.toDataURL('image/png');
+        saveImage(url);
 
-        ctx.drawImage(
-            glCanvas,
-            csx * dpr,
-            csy * dpr,
-            csw * dpr,
-            csh * dpr,
-            0,
-            0,
-            vWidth,
-            vHeight
-        );
+    } catch (e) {
+        console.error("Capture failed:", e);
+    }
+});
 
-        saveImage(canvas.toDataURL('image/png'));
-    });
 
+    // 5. 保存・共有用関数
     async function saveImage(url) {
-
+        // フラッシュエフェクト
         const f = document.createElement('div');
-        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;';
+        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);
-        setTimeout(() => f.remove(), 300);
+        setTimeout(() => { 
+            f.style.transition='opacity .4s'; 
+            f.style.opacity=0; 
+            setTimeout(()=>f.remove(), 400); 
+        }, 50);
 
         if (navigator.share) {
-            const blob = await (await fetch(url)).blob();
-            const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
-            navigator.share({ files: [file] });
+            try {
+                const blob = await (await fetch(url)).blob();
+                const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
+                await navigator.share({ files: [file] });
+            } catch (e) {
+                // キャンセル時は何もしない
+            }
         } else {
             const a = document.createElement('a');
             a.href = url;
