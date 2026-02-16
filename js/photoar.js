@@ -97,40 +97,31 @@ window.onload = () => {
     window.addEventListener('touchstart', addPhoto, { passive: false });
 
     // 4. 保存ロジック（正しい比率で保存）
- // 4. 保存ロジック（画面の見た目通りに保存）
 shotBtn.addEventListener('click', async () => {
     try {
         const video = document.querySelector('video');
         const glCanvas = scene.canvas;
         if (!video || !glCanvas) return;
 
-        // 1. 出力サイズを「現在の画面の見た目」に合わせる
-        // window.innerWidth/Height をベースにすることで確実に縦長にする
-        const displayWidth = window.innerWidth;
-        const displayHeight = window.innerHeight;
+        // 1. 画面の見た目（CSSピクセル）のサイズを取得
+        // これを基準にすることで、歪みを防ぎます
+        const displayWidth = glCanvas.clientWidth;
+        const displayHeight = glCanvas.clientHeight;
 
-        // 巨大すぎるファイルにならないよう、最大幅を1080pxに制限
-        let outWidth = displayWidth;
-        let outHeight = displayHeight;
-        const maxResolution = 1080;
-        if (outWidth > maxResolution) {
-            const ratio = maxResolution / outWidth;
-            outWidth = maxResolution;
-            outHeight = outHeight * ratio;
-        }
-
+        // 2. 保存用のCanvasを、今の画面比率と同じに作成
         const canvas = document.createElement('canvas');
-        canvas.width = outWidth;
-        canvas.height = outHeight;
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
         const ctx = canvas.getContext('2d');
 
-        // 2. 背景ビデオを描画（object-fit: cover を再現）
+        // A-Frameのレンダリングを最新の状態にする
+        scene.renderer.render(scene.object3D, scene.camera);
+
+        // 3. 背景ビデオを描画（object-fit: cover 相当の計算）
         const vw = video.videoWidth;
         const vh = video.videoHeight;
-        
-        // ビデオの縦横比を計算（スマホの向きを考慮）
         const videoAspect = vw / vh;
-        const canvasAspect = outWidth / outHeight;
+        const canvasAspect = displayWidth / displayHeight;
 
         let sx, sy, sWidth, sHeight;
         if (videoAspect > canvasAspect) {
@@ -145,14 +136,13 @@ shotBtn.addEventListener('click', async () => {
             sy = (vh - sHeight) / 2;
         }
 
-        ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, outWidth, outHeight);
+        ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, displayWidth, displayHeight);
 
-        // 3. ARレイヤー（A-Frame）を重ねる
-        scene.renderer.render(scene.object3D, scene.camera);
-        const bitmap = await createImageBitmap(glCanvas);
-        ctx.drawImage(bitmap, 0, 0, outWidth, outHeight);
+        // 4. ARレイヤー（写真部分）を重ねる
+        // ここで glCanvas をそのまま drawImage すると歪むため、サイズを明示して描画します
+        ctx.drawImage(glCanvas, 0, 0, displayWidth, displayHeight);
 
-        // 4. ファイルサイズ削減のため JPEG (画質0.8) で保存
+        // 5. 保存（JPEGで軽量化、画質0.8）
         const url = canvas.toDataURL('image/jpeg', 0.8);
         saveImage(url);
 
