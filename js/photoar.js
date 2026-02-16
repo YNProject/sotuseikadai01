@@ -1,23 +1,32 @@
-window.onload = () => {
-    const scene = document.querySelector('a-scene');
+window.onload = async () => {
+    const video = document.getElementById('video-background');
+    const startScreen = document.getElementById('start-screen');
+    const mainUI = document.getElementById('main-ui');
     const arWorld = document.getElementById('ar-world');
     const fileInput = document.getElementById('fileInput');
     const fileLabel = document.getElementById('fileLabel');
-    const startScreen = document.getElementById('start-screen');
-    const mainUI = document.getElementById('main-ui');
 
     let selectedImgUrl = null;
     let selectedAspect = 1;
 
-    // 1. 開始処理（VRをスキップしてARを強制）
-    startScreen.addEventListener('click', () => {
-        // VRモードを経由せず、直接WebXRのARセッションを要求
-        scene.enterVR(); 
-        startScreen.style.display = 'none';
-        mainUI.style.display = 'flex';
-    });
+    // 1. カメラを直接起動する関数
+    async function startCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' },
+                audio: false
+            });
+            video.srcObject = stream;
+            startScreen.style.display = 'none';
+            mainUI.style.display = 'flex';
+        } catch (err) {
+            alert("カメラの起動に失敗しました: " + err);
+        }
+    }
 
-    // 2. 画像選択
+    startScreen.addEventListener('click', startCamera);
+
+    // 2. 画像選択処理
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -30,7 +39,7 @@ window.onload = () => {
                 c.getContext('2d').drawImage(img, 0, 0);
                 selectedImgUrl = c.toDataURL('image/jpeg', 0.8);
                 selectedAspect = img.width / img.height;
-                fileLabel.innerText = "✅ 空間をタップ！";
+                fileLabel.innerText = "✅ 画面をタップ！";
                 fileLabel.style.background = "#2e7d32";
             };
             img.src = ev.target.result;
@@ -38,8 +47,8 @@ window.onload = () => {
         reader.readAsDataURL(file);
     });
 
-    // 3. 空間配置
-    scene.addEventListener('click', (e) => {
+    // 3. 配置処理
+    document.querySelector('a-scene').addEventListener('click', (e) => {
         if (!selectedImgUrl || e.target.closest('.ui-btn')) return;
 
         const camera = document.getElementById('myCamera').object3D;
@@ -49,7 +58,7 @@ window.onload = () => {
         camera.getWorldDirection(dir);
 
         const plane = document.createElement('a-plane');
-        const dist = 1.2;
+        const dist = 1.5;
         const targetPos = {
             x: pos.x - dir.x * dist,
             y: pos.y - dir.y * dist,
@@ -59,10 +68,10 @@ window.onload = () => {
         plane.setAttribute('position', targetPos);
         plane.setAttribute('material', 'shader:flat;side:double;transparent:true;src:' + selectedImgUrl);
         
-        // 直立してカメラを向く
+        // 常にカメラの方向（垂直）を向かせる
         plane.object3D.lookAt(new THREE.Vector3(pos.x, targetPos.y, pos.z));
 
-        const size = 0.5;
+        const size = 0.6;
         if (selectedAspect >= 1) {
             plane.setAttribute('width', size);
             plane.setAttribute('height', size / selectedAspect);

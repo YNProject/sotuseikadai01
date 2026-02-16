@@ -1,34 +1,31 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>空間固定AR</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: transparent; }
-        
-        /* スタート画面 */
+        /* カメラ映像を一番奥に配置 */
+        #video-background {
+            position: fixed; top: 0; left: 0; min-width: 100%; min-height: 100%;
+            z-index: -1; object-fit: cover;
+        }
+        body { margin: 0; overflow: hidden; background: #000; }
         #start-screen {
             position: fixed; inset: 0; background: #000; color: #fff;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 10000; cursor: pointer;
         }
-
-        /* UI：AR.jsの時と同じデザイン */
         .ui-container {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            z-index: 999; display: none; gap: 10px; width: 90%; max-width: 400px;
+            z-index: 1000; display: none; gap: 10px; width: 90%; max-width: 400px;
         }
-
         .ui-btn {
-            flex: 1; padding: 15px 0; background: rgba(0, 0, 0, 0.8); color: white;
-            border: 2px solid white; border-radius: 50px; text-align: center;
-            font-size: 14px; font-weight: bold; cursor: pointer; text-decoration: none;
+            flex: 1; padding: 15px 0; background: rgba(0,0,0,0.8); color: #fff;
+            border: 2px solid #fff; border-radius: 50px; text-align: center;
+            font-size: 14px; font-weight: bold; cursor: pointer;
         }
-
-        /* VR/ARボタンを強制非表示 */
-        .a-enter-vr, .a-enter-ar { display: none !important; }
     </style>
 </head>
 <body>
@@ -38,16 +35,15 @@
         <p>画面をタップして開始</p>
     </div>
 
+    <video id="video-background" autoplay playsinline></video>
+
     <div class="ui-container" id="main-ui">
         <input type="file" id="fileInput" accept="image/*" style="display:none">
         <label for="fileInput" class="ui-btn" id="fileLabel">① 写真を選ぶ</label>
-        <button class="ui-btn" id="shotBtn" type="button">② 写真を撮る</button>
+        <button class="ui-btn" id="shotBtn">② 写真を撮る</button>
     </div>
 
-    <a-scene 
-        webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #main-ui;"
-        vr-mode-ui="enabled: false">
-        
+    <a-scene embedded vr-mode-ui="enabled: false">
         <a-entity id="myCamera" camera look-controls position="0 1.6 0"></a-entity>
         <a-entity id="ar-world"></a-entity>
     </a-scene>
