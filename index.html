@@ -5,26 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>空間固定AR</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-<style>
-    /* 既存のCSSに追加・修正 */
-    #video-background {
-        position: fixed; top: 0; left: 0; min-width: 100%; min-height: 100%;
-        z-index: -2; /* 一番奥 */
-        object-fit: cover;
-    }
-    
-    a-scene {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        z-index: 1; /* ビデオの上、UIの下 */
-        pointer-events: none; /* シーン自体はタップを貫通させる */
-    }
+    <style>
+        /* カメラ映像を最背面に固定 */
+        #video-background {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: -2; object-fit: cover; background: #000;
+        }
+        
+        /* A-Frameの描画エリアを完全に透明にする */
+        a-scene {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1;
+        }
 
-    .ui-container {
-        position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-        z-index: 1000; display: none; gap: 10px; width: 90%; max-width: 400px;
-        pointer-events: auto; /* ボタンはタップできるように */
-    }
-</style>
+        body { margin: 0; overflow: hidden; background: transparent; }
+
+        #start-screen {
+            position: fixed; inset: 0; background: #000; color: #fff;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 10000; cursor: pointer;
+        }
+
+        .ui-container {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            z-index: 1001; display: none; gap: 10px; width: 90%; max-width: 400px;
+        }
+
+        .ui-btn {
+            flex: 1; padding: 15px 0; background: rgba(0,0,0,0.8); color: #fff;
+            border: 2px solid #fff; border-radius: 50px; text-align: center;
+            font-size: 14px; font-weight: bold; cursor: pointer;
+        }
+    </style>
 </head>
 <body>
 
@@ -41,8 +53,8 @@
         <button class="ui-btn" id="shotBtn">② 写真を撮る</button>
     </div>
 
-    <a-scene embedded vr-mode-ui="enabled: false">
-        <a-entity id="myCamera" camera look-controls position="0 1.6 0"></a-entity>
+    <a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; colorManagement: true;">
+        <a-sky color="#000" opacity="0"></a-sky> <a-entity id="myCamera" camera look-controls position="0 1.6 0"></a-entity>
         <a-entity id="ar-world"></a-entity>
     </a-scene>
 
