@@ -10,7 +10,7 @@ window.onload = () => {
     let canPlace = false;
     let appStarted = false;
 
-    // 1. スタート画面
+    // 1. スタート画面制御
     startScreen.addEventListener('click', () => {
         startScreen.style.opacity = '0';
         setTimeout(() => {
@@ -20,7 +20,7 @@ window.onload = () => {
         }, 400);
     });
 
-    // 2. 画像選択
+    // 2. 画像選択・リサイズ
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -88,77 +88,74 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
-    // 4. 保存機能（ここを確実に動くように修正しました）
-    shotBtn.addEventListener('click', async () => {
+    // 4. 保存ロジック（うまく動いていた時の構造を維持）
+    shotBtn.addEventListener('click', () => {
         try {
             const video = document.querySelector('video');
             const glCanvas = scene.canvas;
 
-            if (!video || !glCanvas) {
-                alert("準備中です。カメラが映るまでお待ちください。");
-                return;
-            }
-
-            // A-Frameの描画を最新にする
+            // 再描画を強制して最新状態をCanvasに送る
             scene.renderer.render(scene.object3D, scene.camera);
 
             const vWidth = video.clientWidth;
             const vHeight = video.clientHeight;
+
+            // ビデオの元データ解像度
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
 
             const canvas = document.createElement('canvas');
             canvas.width = vWidth;
             canvas.height = vHeight;
             const ctx = canvas.getContext('2d');
 
-            // ビデオの元サイズ
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
+            // --- 【ここが修正ポイント】カメラ映像を中央から切り抜く計算 ---
             const videoAspect = vw / vh;
             const screenAspect = vWidth / vHeight;
+            let sx, sy, sWidth, sHeight;
 
-            let sx, sy, sw, sh;
             if (videoAspect > screenAspect) {
-                sw = vh * screenAspect; sh = vh;
-                sx = (vw - sw) / 2; sy = 0;
+                // ビデオの方が横長（左右を削る）
+                sWidth = vh * screenAspect;
+                sHeight = vh;
+                sx = (vw - sWidth) / 2;
+                sy = 0;
             } else {
-                sw = vw; sh = vw / screenAspect;
-                sx = 0; sy = (vh - sh) / 2;
+                // ビデオの方が縦長（上下を削る）
+                sWidth = vw;
+                sHeight = vw / screenAspect;
+                sx = 0;
+                sy = (vh - sHeight) / 2;
             }
 
-            // 背景とARを合成
-            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, vWidth, vHeight);
+            // 背景（カメラ）を描画：切り抜き(sx, sy, sWidth, sHeight)を適用
+            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, vWidth, vHeight);
+            
+            // AR（ラーメンなど）を描画
             ctx.drawImage(glCanvas, 0, 0, vWidth, vHeight);
 
             const url = canvas.toDataURL('image/png');
-
-            // 保存処理の呼び出し
-            await triggerSave(url);
+            saveImage(url);
 
         } catch (e) {
-            alert("エラー: " + e.message);
+            console.error("Capture failed:", e);
         }
     });
 
-    // 5. 保存実行関数（shotBtnの中から呼び出されます）
-    async function triggerSave(url) {
-        // フラッシュ演出
+    // 5. 保存実行関数（元の位置に配置）
+    async function saveImage(url) {
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);
-        setTimeout(() => { 
-            f.style.transition='opacity .4s'; 
-            f.style.opacity=0; 
-            setTimeout(()=>f.remove(), 400); 
-        }, 50);
+        setTimeout(() => { f.style.transition='opacity .4s'; f.style.opacity=0; setTimeout(()=>f.remove(),400); }, 50);
 
-        // 保存・共有
         if (navigator.share) {
             try {
                 const blob = await (await fetch(url)).blob();
                 const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
                 await navigator.share({ files: [file] });
             } catch (e) {
-                console.log("Share cancelled");
+                // キャンセル時
             }
         } else {
             const a = document.createElement('a');
