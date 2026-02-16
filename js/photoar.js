@@ -27,13 +27,16 @@ window.onload = () => {
     // 画像選択
     // -------------------
     fileInput.addEventListener('change', (e) => {
+
         const file = e.target.files[0];
         if (!file) return;
 
         const reader = new FileReader();
+
         reader.onload = (event) => {
 
             const img = new Image();
+
             img.onload = () => {
 
                 const maxSide = 1024;
@@ -78,10 +81,12 @@ window.onload = () => {
 
         const pos = new THREE.Vector3();
         const dir = new THREE.Vector3();
+
         cameraObj.getWorldPosition(pos);
         cameraObj.getWorldDirection(dir);
 
         const newImage = document.createElement('a-plane');
+
         newImage.setAttribute('material', 'side: double; shader: flat; transparent: true;');
 
         const distance = 1.2;
@@ -92,36 +97,39 @@ window.onload = () => {
             z: pos.z + dir.z * -distance
         });
 
+        scene.appendChild(newImage);
+
         const loader = new THREE.TextureLoader();
 
         loader.load(selectedImgUrl, (texture) => {
 
-            const mesh = newImage.getObject3D('mesh');
-            mesh.material.map = texture;
-            mesh.material.needsUpdate = true;
+            newImage.addEventListener('loaded', () => {
 
-            // アスペクト維持
-            const imgW = texture.image.width;
-            const imgH = texture.image.height;
-            const aspect = imgW / imgH;
+                const mesh = newImage.getObject3D('mesh');
+                if (!mesh) return;
 
-            const maxSize = 0.25;
+                mesh.material.map = texture;
+                mesh.material.needsUpdate = true;
 
-            if (aspect >= 1) {
-                newImage.setAttribute('width', maxSize);
-                newImage.setAttribute('height', maxSize / aspect);
-            } else {
-                newImage.setAttribute('height', maxSize);
-                newImage.setAttribute('width', maxSize * aspect);
-            }
+                const imgW = texture.image.width;
+                const imgH = texture.image.height;
+                const aspect = imgW / imgH;
 
-            // ★ 設置時だけカメラを見る
-            const camPos = new THREE.Vector3();
-            cameraObj.getWorldPosition(camPos);
-            newImage.object3D.lookAt(camPos);
+                const maxSize = 0.25;
+
+                if (aspect >= 1) {
+                    newImage.setAttribute('width', maxSize);
+                    newImage.setAttribute('height', maxSize / aspect);
+                } else {
+                    newImage.setAttribute('height', maxSize);
+                    newImage.setAttribute('width', maxSize * aspect);
+                }
+
+                const camPos = new THREE.Vector3();
+                cameraObj.getWorldPosition(camPos);
+                newImage.object3D.lookAt(camPos);
+            });
         });
-
-        scene.appendChild(newImage);
 
         canPlace = false;
         fileLabel.innerText = "① 写真を選ぶ";
@@ -169,26 +177,10 @@ window.onload = () => {
 
             const dataURL = finalCanvas.toDataURL('image/png');
 
-            const flash = document.createElement('div');
-            flash.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:white;z-index:10001;';
-            document.body.appendChild(flash);
-
-            setTimeout(() => {
-                flash.style.transition = 'opacity 0.4s';
-                flash.style.opacity = '0';
-                setTimeout(() => flash.remove(), 400);
-            }, 50);
-
-            if (navigator.share) {
-                const blob = await (await fetch(dataURL)).blob();
-                const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
-                await navigator.share({ files: [file] }).catch(() => {});
-            } else {
-                const link = document.createElement('a');
-                link.download = `ar-${Date.now()}.png`;
-                link.href = dataURL;
-                link.click();
-            }
+            const link = document.createElement('a');
+            link.download = `ar-${Date.now()}.png`;
+            link.href = dataURL;
+            link.click();
 
         } catch (err) {
             console.error(err);
