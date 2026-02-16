@@ -7,7 +7,7 @@ window.onload = () => {
     const mainUI = document.getElementById('main-ui');
 
     let selectedImgUrl = null;
-    let selectedAspect = 1; // ← アスペクト比を保持
+    let selectedAspect = 1; 
     let canPlace = false;
     let appStarted = false;
 
@@ -38,7 +38,7 @@ window.onload = () => {
                 const ctx = c.getContext('2d');
                 ctx.drawImage(img, 0, 0, w, h);
                 selectedImgUrl = c.toDataURL('image/jpeg', 0.9);
-                selectedAspect = w / h; // ← アスペクト比を保存
+                selectedAspect = w / h;
                 canPlace = true;
                 fileLabel.innerText = "✅ 画面をタップ！";
                 fileLabel.style.background = "#2e7d32";
@@ -84,7 +84,6 @@ window.onload = () => {
                 plane.setAttribute('height', size);
                 plane.setAttribute('width', size * selectedAspect);
             }
-
             plane.object3D.lookAt(pos);
         });
 
@@ -96,62 +95,58 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, { passive: false });
 
-    // 4. 保存ロジック（正しい比率で保存）
-shotBtn.addEventListener('click', async () => {
-    try {
-        const video = document.querySelector('video');
-        const glCanvas = scene.canvas;
-        if (!video || !glCanvas) return;
+    // 4. 保存ロジック（縦画面対応 ＆ 軽量化）
+    shotBtn.addEventListener('click', async () => {
+        try {
+            const video = document.querySelector('video');
+            const glCanvas = scene.canvas;
+            if (!video || !glCanvas) return;
 
-        // 1. 画面の見た目（CSSピクセル）のサイズを取得
-        // これを基準にすることで、歪みを防ぎます
-        const displayWidth = glCanvas.clientWidth;
-        const displayHeight = glCanvas.clientHeight;
+            // 1. 物理的な解像度ではなく「画面の見た目」のサイズを基準にする
+            const outWidth = glCanvas.clientWidth;
+            const outHeight = glCanvas.clientHeight;
 
-        // 2. 保存用のCanvasを、今の画面比率と同じに作成
-        const canvas = document.createElement('canvas');
-        canvas.width = displayWidth;
-        canvas.height = displayHeight;
-        const ctx = canvas.getContext('2d');
+            const canvas = document.createElement('canvas');
+            canvas.width = outWidth;
+            canvas.height = outHeight;
+            const ctx = canvas.getContext('2d');
 
-        // A-Frameのレンダリングを最新の状態にする
-        scene.renderer.render(scene.object3D, scene.camera);
+            // レンダリング更新
+            scene.renderer.render(scene.object3D, scene.camera);
 
-        // 3. 背景ビデオを描画（object-fit: cover 相当の計算）
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
-        const videoAspect = vw / vh;
-        const canvasAspect = displayWidth / displayHeight;
+            // 2. 背景ビデオを「画面の見た目通り」に切り抜いて描画
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            const videoAspect = vw / vh;
+            const canvasAspect = outWidth / outHeight;
 
-        let sx, sy, sWidth, sHeight;
-        if (videoAspect > canvasAspect) {
-            sWidth = vh * canvasAspect;
-            sHeight = vh;
-            sx = (vw - sWidth) / 2;
-            sy = 0;
-        } else {
-            sWidth = vw;
-            sHeight = vw / canvasAspect;
-            sx = 0;
-            sy = (vh - sHeight) / 2;
+            let sx, sy, sWidth, sHeight;
+            if (videoAspect > canvasAspect) {
+                sWidth = vh * canvasAspect;
+                sHeight = vh;
+                sx = (vw - sWidth) / 2;
+                sy = 0;
+            } else {
+                sWidth = vw;
+                sHeight = vw / canvasAspect;
+                sx = 0;
+                sy = (vh - sHeight) / 2;
+            }
+
+            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, outWidth, outHeight);
+
+            // 3. ARレイヤー（A-Frame）を重ねる。サイズ指定で歪みを防止。
+            ctx.drawImage(glCanvas, 0, 0, outWidth, outHeight);
+
+            // 4. JPEG（画質0.8）で保存。ファイルサイズが大幅に削減されます。
+            const url = canvas.toDataURL('image/jpeg', 0.8);
+            saveImage(url);
+
+        } catch (e) {
+            console.error("Capture failed:", e);
         }
+    });
 
-        ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, displayWidth, displayHeight);
-
-        // 4. ARレイヤー（写真部分）を重ねる
-        // ここで glCanvas をそのまま drawImage すると歪むため、サイズを明示して描画します
-        ctx.drawImage(glCanvas, 0, 0, displayWidth, displayHeight);
-
-        // 5. 保存（JPEGで軽量化、画質0.8）
-        const url = canvas.toDataURL('image/jpeg', 0.8);
-        saveImage(url);
-
-    } catch (e) {
-        console.error("Capture failed:", e);
-    }
-});
-
-    // 5. 保存・共有用関数
     async function saveImage(url) {
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
@@ -165,15 +160,13 @@ shotBtn.addEventListener('click', async () => {
         if (navigator.share) {
             try {
                 const blob = await (await fetch(url)).blob();
-                const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
+                const file = new File([blob], `ar-${Date.now()}.jpg`, { type: 'image/jpeg' });
                 await navigator.share({ files: [file] });
-            } catch (e) {
-                // キャンセル時は何もしない
-            }
+            } catch (e) {}
         } else {
             const a = document.createElement('a');
             a.href = url;
-            a.download = `ar-${Date.now()}.png`;
+            a.download = `ar-${Date.now()}.jpg`;
             a.click();
         }
     }

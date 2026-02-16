@@ -1,4 +1,3 @@
-/* style.css */
 body { margin: 0; overflow: hidden; touch-action: none; font-family: sans-serif; }
 
 /* スタート画面 */
@@ -12,7 +11,7 @@ body { margin: 0; overflow: hidden; touch-action: none; font-family: sans-serif;
 #start-screen p { font-size: 16px; opacity: 0.8; animation: blink 2s infinite; }
 @keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
 
-/* UIコンテナ（JSでflexに変更されるまで非表示） */
+/* UIコンテナ */
 .ui-container {
     position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
     z-index: 10000; display: none; gap: 10px; width: 90%; justify-content: center;
@@ -27,15 +26,10 @@ button, label {
     -webkit-tap-highlight-color: transparent;
 }
 
-canvas.a-canvas { z-index: 1 !important; }
+/* キャンバスの歪み防止 */
+canvas.a-canvas { 
+    z-index: 1 !important; 
+    width: 100% !important; 
+    height: 100% !important; 
+}
 .a-enter-vr { display: none; }
-
-
-    /* a-scene {
-        width: 100vw;
-        height: 100vh;
-        display: block;
-        position: fixed;
-        top: 0;
-        left: 0;
-    } */
