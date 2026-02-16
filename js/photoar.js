@@ -70,7 +70,7 @@ window.onload = () => {
             const mesh = plane.getObject3D('mesh');
             mesh.material.map = tex;
             mesh.material.needsUpdate = true;
-            const size = 0.5;
+            const size = 0.2;
             if (selectedAspect >= 1) {
                 plane.setAttribute('width', size);
                 plane.setAttribute('height', size / selectedAspect);
