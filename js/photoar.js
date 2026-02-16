@@ -99,7 +99,6 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
-    // 4. 保存ロジック（比率修正済み）
 // 4. 保存ロジック（比率修正済み）
 shotBtn.addEventListener('click', () => {
     try {
@@ -107,59 +106,40 @@ shotBtn.addEventListener('click', () => {
         const glCanvas = scene.canvas;
         if (!video || !glCanvas) return;
 
-        // 最新の状態をレンダリング
+        // レンダリングを最新状態に
         scene.renderer.render(scene.object3D, scene.camera);
 
-        const vWidth = video.clientWidth;
-        const vHeight = video.clientHeight;
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
-
+        // 出力用Canvasのサイズを「表示されているビデオのサイズ」に合わせる
         const canvas = document.createElement('canvas');
-        canvas.width = vWidth;
-        canvas.height = vHeight;
+        canvas.width = video.clientWidth;
+        canvas.height = video.clientHeight;
         const ctx = canvas.getContext('2d');
 
-        // --- ビデオ背景の計算 (object-fit: cover を再現) ---
+        // 1. ビデオ背景を描画 (表示されている通りに切り抜く)
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
         const videoAspect = vw / vh;
-        const screenAspect = vWidth / vHeight;
-        let sx, sy, sWidth, sHeight;
+        const screenAspect = canvas.width / canvas.height;
 
+        let sx, sy, sw, sh;
         if (videoAspect > screenAspect) {
-            sWidth = vh * screenAspect;
-            sHeight = vh;
-            sx = (vw - sWidth) / 2;
+            sw = vh * screenAspect;
+            sh = vh;
+            sx = (vw - sw) / 2;
             sy = 0;
         } else {
-            sWidth = vw;
-            sHeight = vw / screenAspect;
+            sw = vw;
+            sh = vw / screenAspect;
             sx = 0;
-            sy = (vh - sHeight) / 2;
+            sy = (vh - sh) / 2;
         }
+        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
 
-        // 1. カメラ背景を描画
-        ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, vWidth, vHeight);
-        
-        // 2. ARレイヤー（Canvas）を「アスペクト比を維持して中央切り抜き」で合成
-        // ★ここが修正ポイント★
-        const cw = glCanvas.width;
-        const ch = glCanvas.height;
-        const canvasAspect = cw / ch;
-
-        let csx, csy, csWidth, csHeight;
-        if (canvasAspect > screenAspect) {
-            csWidth = ch * screenAspect;
-            csHeight = ch;
-            csx = (cw - csWidth) / 2;
-            csy = 0;
-        } else {
-            csWidth = cw;
-            csHeight = cw / screenAspect;
-            csx = 0;
-            csy = (ch - csHeight) / 2;
-        }
-
-        ctx.drawImage(glCanvas, csx, csy, csWidth, csHeight, 0, 0, vWidth, vHeight);
+        // 2. ARレイヤーの描画（ここが重要！）
+        // 画面上の見た目（glCanvas.style.width/height）と 
+        // 内部解像度（glCanvas.width/height）の差を無視して、
+        // 単純に「表示サイズ」に合わせて上書きします。
+        ctx.drawImage(glCanvas, 0, 0, canvas.width, canvas.height);
 
         const url = canvas.toDataURL('image/png');
         saveImage(url);
