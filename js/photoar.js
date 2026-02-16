@@ -135,40 +135,74 @@ window.addEventListener('touchstart',addPhoto);
 // ----------------
 shotBtn.addEventListener('click', async () => {
     try {
+        const video = document.querySelector('video');
         const sceneEl = document.querySelector('a-scene');
+        // A-Frameのscreenshotコンポーネントを確実に使う
+        const glCanvas = sceneEl.components.screenshot.getCanvas('perspective');
+
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const sw = window.innerWidth;
+        const sh = window.innerHeight;
+
+        // 1. 保存用キャンバスを作成（現在のブラウザ表示サイズに合わせる）
+        const canvas = document.createElement('canvas');
+        canvas.width = sw;
+        canvas.height = sh;
+        const ctx = canvas.getContext('2d');
+
+        // 2. カメラ映像を「画面で見えている通り」に切り取って描画
+        // AR.jsのvideoはCSSでobject-fit:cover状態なので、それを再現します
+        const videoAspect = vw / vh;
+        const screenAspect = sw / sh;
+
+        let sx, sy, sWidth, sHeight;
+        if (videoAspect > screenAspect) {
+            sWidth = vh * screenAspect;
+            sHeight = vh;
+            sx = (vw - sWidth) / 2;
+            sy = 0;
+        } else {
+            sWidth = vw;
+            sHeight = vw / screenAspect;
+            sx = 0;
+            sy = (vh - sHeight) / 2;
+        }
+
+        // カメラを描画
+        ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, sw, sh);
+
+        // 3. ARレイヤーを重ねる（glCanvasは元々画面サイズなのでそのまま重ねる）
+        ctx.drawImage(glCanvas, 0, 0, sw, sh);
+
+        // 4. 保存・共有
+        const url = canvas.toDataURL('image/png');
         
-        // A-Frameが画面描画に使っているCanvasを直接取得
-        // A-Frameは内部でカメラ映像も背景として描画しているため、
-        // このCanvasを保存すれば「見たまま」が手に入ります。
-        const glCanvas = sceneEl.canvas; 
-
-        // 1. そのまま画像化（画面で見ているサイズ・比率になります）
-        const url = glCanvas.toDataURL('image/png');
-
-        // --- フラッシュ演出 ---
+        // フラッシュ演出（動いているか確認用）
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);
-        setTimeout(() => {
-            f.style.transition = 'opacity 0.4s';
-            f.style.opacity = '0';
-            setTimeout(() => f.remove(), 400);
-        }, 50);
+        setTimeout(() => { f.style.transition='opacity .4s'; f.style.opacity=0; setTimeout(()=>f.remove(),400); }, 50);
 
-        // --- 保存・共有処理 ---
         if (navigator.share) {
             const blob = await (await fetch(url)).blob();
-            const file = new File([blob], `ar-snap-${Date.now()}.png`, { type: 'image/png' });
-            await navigator.share({ files: [file] }).catch(() => {});
+            const file = new File([blob], `ar-${Date.now()}.png`, {type:'image/png'});
+            await navigator.share({files:[file]}).catch(() => {
+                // shareがキャンセルされた場合のフォールバック
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ar-${Date.now()}.png`;
+                a.click();
+            });
         } else {
             const a = document.createElement('a');
             a.href = url;
-            a.download = `ar-snap-${Date.now()}.png`;
+            a.download = `ar-${Date.now()}.png`;
             a.click();
         }
-
     } catch (e) {
-        console.error("Screenshot Error:", e);
+        alert("エラーが発生しました: " + e);
+        console.error(e);
     }
 });
 };
