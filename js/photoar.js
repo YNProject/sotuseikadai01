@@ -136,56 +136,70 @@ window.addEventListener('touchstart',addPhoto);
 shotBtn.addEventListener('click', async () => {
     try {
         const video = document.querySelector('video');
-        // A-Frameのスクリーンショット用コンポーネントからCanvasを取得
-        const glCanvas = scene.components.screenshot.getCanvas('perspective');
+        const sceneEl = document.querySelector('a-scene');
+        // A-Frameのスクリーンショットコンポーネント
+        const glCanvas = sceneEl.components.screenshot.getCanvas('perspective');
 
+        // 1. ビデオの解像度
         const vw = video.videoWidth;
         const vh = video.videoHeight;
+        const vAspect = vw / vh;
 
+        // 2. ブラウザで見ている画面のサイズ（CSSサイズ）
+        const windowW = window.innerWidth;
+        const windowH = window.innerHeight;
+        const screenAspect = windowW / windowH;
+
+        // 保存用キャンバスを作成（カメラ解像度に合わせる）
         const canvas = document.createElement('canvas');
         canvas.width = vw;
         canvas.height = vh;
         const ctx = canvas.getContext('2d');
 
-        // 1. まずカメラ映像をフルサイズで描画
+        // --- 手順1: カメラ映像をそのまま描画 ---
         ctx.drawImage(video, 0, 0, vw, vh);
 
-        // 2. AR側のCanvas（glCanvas）をカメラの比率に合わせて計算
-        const vAspect = vw / vh;
-        const gAspect = glCanvas.width / glCanvas.height;
-
+        // --- 手順2: ARレイヤーをアスペクト比を維持して重ねる ---
+        // glCanvasは画面全体のサイズで描画されているため、
+        // カメラ映像（vw/vh）と同じ比率の部分だけを抽出します。
+        
         let sWidth, sHeight, sx, sy;
 
+        // glCanvas側の比率
+        const gAspect = glCanvas.width / glCanvas.height;
+
         if (gAspect > vAspect) {
-            // AR側が横長すぎる場合、左右をカット
+            // AR側が横に長い場合（左右をカット）
             sHeight = glCanvas.height;
             sWidth = glCanvas.height * vAspect;
             sx = (glCanvas.width - sWidth) / 2;
             sy = 0;
         } else {
-            // AR側が縦長すぎる場合、上下をカット
+            // AR側が縦に長い場合（上下をカット）
             sWidth = glCanvas.width;
             sHeight = glCanvas.width / vAspect;
             sx = 0;
             sy = (glCanvas.height - sHeight) / 2;
         }
 
-        // 3. glCanvasの「正しい比率の部分」だけを抜き出して、カメラと同じサイズで重ねる
+        // 描画：元画像の(sx, sy)から(sWidth, sHeight)の範囲を、
+        // 保存用キャンバスの(0, 0, vw, vh)にぴったり収める
         ctx.drawImage(glCanvas, sx, sy, sWidth, sHeight, 0, 0, vw, vh);
 
-        // --- 以下、保存・共有処理 ---
+        // --- 手順3: 書き出し ---
         const url = canvas.toDataURL('image/png');
-
-        // フラッシュ演出
+        
+        // フラッシュ（演出）
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);
         setTimeout(() => {
             f.style.transition = 'opacity 0.4s';
-            f.style.opacity = 0;
+            f.style.opacity = '0';
             setTimeout(() => f.remove(), 400);
         }, 50);
 
+        // 保存/共有
         if (navigator.share) {
             const blob = await (await fetch(url)).blob();
             const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
@@ -199,7 +213,7 @@ shotBtn.addEventListener('click', async () => {
 
     } catch (e) {
         console.error("Capture Error:", e);
+        alert("キャプチャに失敗しました。");
     }
 });
-
 };
