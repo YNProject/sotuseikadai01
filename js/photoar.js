@@ -3,11 +3,17 @@ window.onload = () => {
     const arWorld = document.getElementById('ar-world');
     const fileInput = document.getElementById('fileInput');
     const fileLabel = document.getElementById('fileLabel');
+    const startScreen = document.getElementById('start-screen');
 
     let selectedImgUrl = null;
     let selectedAspect = 1;
 
-    // 画像選択
+    // 1. 開始時の処理
+    scene.addEventListener('enter-vr', () => {
+        startScreen.style.display = 'none';
+    });
+
+    // 2. 画像の読み込みとリサイズ
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -26,29 +32,30 @@ window.onload = () => {
                 selectedImgUrl = c.toDataURL('image/jpeg', 0.8);
                 selectedAspect = w / h;
                 fileLabel.innerText = "✅ 画面をタップ！";
-                fileLabel.style.background = "#2e7d32";
+                fileLabel.style.borderColor = "#4caf50";
             };
             img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
     });
 
-    // 写真配置
-    // WebXRでは「select」イベントが画面タップに相当します
+    // 3. 空間への配置
     scene.addEventListener('click', (e) => {
-        // UIボタンをクリックした時は配置しない
-        if (!selectedImgUrl || e.target.closest('#main-ui')) return;
+        // ボタン領域のクリックなら無視
+        if (!selectedImgUrl || e.target.closest('.button-row')) return;
 
         const camObj = document.getElementById('myCamera').object3D;
         const pos = new THREE.Vector3();
         const dir = new THREE.Vector3();
         
+        // カメラの現在の世界座標と向きを取得
         camObj.getWorldPosition(pos);
         camObj.getWorldDirection(dir);
 
         const plane = document.createElement('a-plane');
-        // 1.5m先に固定（これで歩いて離れられるようになります）
-        const dist = 1.5;
+        
+        // 1.2m先に配置
+        const dist = 1.2;
         plane.setAttribute('position', {
             x: pos.x - dir.x * dist,
             y: pos.y - dir.y * dist,
@@ -56,11 +63,17 @@ window.onload = () => {
         });
         
         plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
+        
+        // 写真をカメラの方へ向かせる
         plane.object3D.lookAt(pos);
 
+        // テクスチャ適用とサイズ調整
         new THREE.TextureLoader().load(selectedImgUrl, tex => {
-            plane.getObject3D('mesh').material.map = tex;
-            const size = 0.8;
+            const mesh = plane.getObject3D('mesh');
+            mesh.material.map = tex;
+            mesh.material.needsUpdate = true;
+            
+            const size = 0.5; // 基本サイズ（メートル単位）
             if (selectedAspect >= 1) {
                 plane.setAttribute('width', size);
                 plane.setAttribute('height', size / selectedAspect);
@@ -71,15 +84,16 @@ window.onload = () => {
         });
 
         arWorld.appendChild(plane);
-        
-        // リセット
+
+        // 状態リセット
         selectedImgUrl = null;
         fileLabel.innerText = "① 写真を選ぶ";
-        fileLabel.style.background = "rgba(0,0,0,0.7)";
+        fileLabel.style.borderColor = "white";
     });
 
-    // 保存ボタン（WebXRモードでのキャプチャはブラウザ制限が厳しいため、まずは配置の成功を確認しましょう）
+    // 4. 保存機能（WebXR対応版）
     document.getElementById('shotBtn').addEventListener('click', () => {
-        alert("配置が安定したら、このボタンで保存できるように調整します！");
+        // WebXRでの完全なキャプチャは複雑なため、まずは配置の安定を確認
+        alert("配置に成功したら、次は保存機能を最適化しましょう！");
     });
 };
