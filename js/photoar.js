@@ -7,6 +7,7 @@ window.onload = () => {
     const mainUI = document.getElementById('main-ui');
 
     let selectedImgUrl = null;
+    let selectedAspect = 1; // ← アスペクト比を保持
     let canPlace = false;
     let appStarted = false;
 
@@ -37,6 +38,7 @@ window.onload = () => {
                 const ctx = c.getContext('2d');
                 ctx.drawImage(img, 0, 0, w, h);
                 selectedImgUrl = c.toDataURL('image/jpeg', 0.9);
+                selectedAspect = w / h; // ← アスペクト比を保存
                 canPlace = true;
                 fileLabel.innerText = "✅ 画面をタップ！";
                 fileLabel.style.background = "#2e7d32";
@@ -73,15 +75,16 @@ window.onload = () => {
             const mesh = plane.getObject3D('mesh');
             mesh.material.map = tex;
             mesh.material.needsUpdate = true;
-            const a = tex.image.width / tex.image.height;
+
             const size = 0.5;
-            if (a >= 1) { 
-                plane.setAttribute('width', size); 
-                plane.setAttribute('height', size / a); 
-            } else { 
-                plane.setAttribute('height', size); 
-                plane.setAttribute('width', size * a); 
+            if (selectedAspect >= 1) {
+                plane.setAttribute('width', size);
+                plane.setAttribute('height', size / selectedAspect);
+            } else {
+                plane.setAttribute('height', size);
+                plane.setAttribute('width', size * selectedAspect);
             }
+
             plane.object3D.lookAt(pos);
         });
 
@@ -91,9 +94,9 @@ window.onload = () => {
     }
 
     window.addEventListener('mousedown', addPhoto);
-    window.addEventListener('touchstart', addPhoto, {passive: false});
+    window.addEventListener('touchstart', addPhoto, { passive: false });
 
-    // 4. 保存ロジック（画面表示と同じ比率で保存）
+    // 4. 保存ロジック（正しい比率で保存）
     shotBtn.addEventListener('click', async () => {
         try {
             const video = document.querySelector('video');
@@ -103,18 +106,34 @@ window.onload = () => {
             scene.renderer.render(scene.object3D, scene.camera);
 
             const canvas = document.createElement('canvas');
-            const width = glCanvas.clientWidth;
-            const height = glCanvas.clientHeight;
-            canvas.width = width;
-            canvas.height = height;
+            canvas.width = glCanvas.width;
+            canvas.height = glCanvas.height;
             const ctx = canvas.getContext('2d');
 
-            // ビデオ背景を描画（画面に見えているサイズで）
-            ctx.drawImage(video, 0, 0, width, height);
+            // ビデオ背景を描画（object-fit: cover 相当）
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            const videoAspect = vw / vh;
+            const canvasAspect = canvas.width / canvas.height;
 
-            // ARレイヤーを描画（画面と同じサイズで）
+            let sx, sy, sWidth, sHeight;
+            if (videoAspect > canvasAspect) {
+                sWidth = vh * canvasAspect;
+                sHeight = vh;
+                sx = (vw - sWidth) / 2;
+                sy = 0;
+            } else {
+                sWidth = vw;
+                sHeight = vw / canvasAspect;
+                sx = 0;
+                sy = (vh - sHeight) / 2;
+            }
+
+            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+
+            // ARレイヤーを描画
             const bitmap = await createImageBitmap(glCanvas);
-            ctx.drawImage(bitmap, 0, 0, width, height);
+            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
             const url = canvas.toDataURL('image/png');
             saveImage(url);
@@ -126,14 +145,13 @@ window.onload = () => {
 
     // 5. 保存・共有用関数
     async function saveImage(url) {
-        // フラッシュエフェクト
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);
-        setTimeout(() => { 
-            f.style.transition='opacity .4s'; 
-            f.style.opacity=0; 
-            setTimeout(()=>f.remove(), 400); 
+        setTimeout(() => {
+            f.style.transition = 'opacity .4s';
+            f.style.opacity = 0;
+            setTimeout(() => f.remove(), 400);
         }, 50);
 
         if (navigator.share) {
