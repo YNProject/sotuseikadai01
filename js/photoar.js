@@ -137,52 +137,54 @@ shotBtn.addEventListener('click', async () => {
     try {
         const video = document.querySelector('video');
         const sceneEl = document.querySelector('a-scene');
-        // A-Frame側のCanvasを取得
-        const glCanvas = sceneEl.components.screenshot.getCanvas('perspective');
+        
+        // A-Frameの描画用Canvasを直接取得
+        const glCanvas = sceneEl.canvas; 
 
         const vw = video.videoWidth;
         const vh = video.videoHeight;
         
-        // 1. 出力用のCanvasをカメラの解像度で作成
+        // 保存用Canvas（カメラの解像度）
         const canvas = document.createElement('canvas');
         canvas.width = vw;
         canvas.height = vh;
         const ctx = canvas.getContext('2d');
 
-        // 2. カメラ映像をまず描画
+        // 1. カメラ映像を描画
         ctx.drawImage(video, 0, 0, vw, vh);
 
-        // 3. ARレイヤー（glCanvas）を重ねる
-        // ここがポイント：画面の見た目とビデオの比率の「ズレ」を、
-        // glCanvas側の描画位置を調整することで解消します。
-        const screenAspect = window.innerWidth / window.innerHeight;
+        // 2. ARレイヤー（glCanvas）を計算して重ねる
+        // 画面の比率を取得
+        const screenW = window.innerWidth;
+        const screenH = window.innerHeight;
+        const screenAspect = screenW / screenH;
         const videoAspect = vw / vh;
 
-        let scale, tx, ty;
+        let drawW, drawH, dx, dy;
 
         if (videoAspect > screenAspect) {
-            // ビデオが横長の場合（左右をビデオの幅に合わせる）
-            scale = vw / glCanvas.width;
-            tx = 0;
-            ty = (vh - glCanvas.height * scale) / 2;
+            // ビデオの方が横長（左右に余白ができるパターン）
+            drawH = vh;
+            drawW = vh * screenAspect;
+            dx = (vw - drawW) / 2;
+            dy = 0;
         } else {
-            // ビデオが縦長の場合（上下をビデオの高さに合わせる）
-            scale = vh / glCanvas.height;
-            tx = (vw - glCanvas.width * scale) / 2;
-            ty = 0;
+            // ビデオの方が縦長（上下に余白ができるパターン）
+            drawW = vw;
+            drawH = vw / screenAspect;
+            dx = 0;
+            dy = (vh - drawH) / 2;
         }
 
-        // 変形を適用して描画
-        ctx.setTransform(scale, 0, 0, scale, tx, ty);
-        ctx.drawImage(glCanvas, 0, 0);
-        ctx.setTransform(1, 0, 0, 1, 0, 0); // リセット
+        // ARのCanvasを、計算した「見えている範囲」に合わせて描画
+        ctx.drawImage(glCanvas, dx, dy, drawW, drawH);
 
-        // --- 以下保存処理 ---
+        // --- 以下、保存・共有処理 ---
         const url = canvas.toDataURL('image/png');
-        
+
         // フラッシュ演出
         const f = document.createElement('div');
-        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;opacity:1;';
+        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);
         setTimeout(() => {
             f.style.transition = 'opacity 0.4s';
@@ -195,12 +197,14 @@ shotBtn.addEventListener('click', async () => {
             const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
             await navigator.share({ files: [file] }).catch(() => {});
         } else {
-            const a = document.createElement('a'); a.href = url;
-            a.download = `ar-${Date.now()}.png`; a.click();
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ar-${Date.now()}.png`;
+            a.click();
         }
 
     } catch (e) {
-        console.error(e);
+        console.error("Capture Error:", e);
     }
 });
 };
