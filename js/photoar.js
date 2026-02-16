@@ -94,7 +94,7 @@ window.onload = () => {
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
 // 4. 保存ロジック（ARレイヤーの比率崩れを防止）
-shotBtn.addEventListener('click', () => {
+shotBtn.addEventListener('click', async () => {
     try {
         const video = document.querySelector('video');
         const glCanvas = scene.canvas;
@@ -112,7 +112,7 @@ shotBtn.addEventListener('click', () => {
         canvas.height = vClientH;
         const ctx = canvas.getContext('2d');
 
-        // --- ビデオ背景を描画（object-fit: cover 相当） ---
+        // --- ビデオ背景を描画 ---
         const videoAspect = vw / vh;
         const screenAspect = vClientW / vClientH;
         let sx, sy, sWidth, sHeight;
@@ -131,8 +131,9 @@ shotBtn.addEventListener('click', () => {
 
         ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
-        // --- ARレイヤーを描画（clientサイズで） ---
-        ctx.drawImage(glCanvas, 0, 0, glCanvas.clientWidth, glCanvas.clientHeight, 0, 0, canvas.width, canvas.height);
+        // --- ARレイヤーをImageBitmapとして描画 ---
+        const bitmap = await createImageBitmap(glCanvas);
+        ctx.drawImage(bitmap, 0, 0, vClientW, vClientH);
 
         const url = canvas.toDataURL('image/png');
         saveImage(url);
@@ -141,6 +142,7 @@ shotBtn.addEventListener('click', () => {
         console.error("Capture failed:", e);
     }
 });
+
 
     // 5. 保存・共有用関数
     async function saveImage(url) {
