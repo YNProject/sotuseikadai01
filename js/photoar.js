@@ -1,184 +1,182 @@
 window.onload = () => {
 
-    const scene = document.querySelector('a-scene');
-    const fileInput = document.getElementById('fileInput');
-    const fileLabel = document.getElementById('fileLabel');
-    const shotBtn = document.getElementById('shotBtn');
-    const startScreen = document.getElementById('start-screen');
-    const mainUI = document.getElementById('main-ui');
+const scene = document.querySelector('a-scene');
+const fileInput = document.getElementById('fileInput');
+const fileLabel = document.getElementById('fileLabel');
+const shotBtn = document.getElementById('shotBtn');
+const startScreen = document.getElementById('start-screen');
+const mainUI = document.getElementById('main-ui');
 
-    let selectedImgUrl = null;
-    let canPlace = false;
-    let appStarted = false;
+let selectedImgUrl = null;
+let canPlace = false;
+let appStarted = false;
 
-    // スタート画面
-    startScreen.addEventListener('click', () => {
-        startScreen.style.opacity = '0';
-        setTimeout(() => {
-            startScreen.style.display = 'none';
-            mainUI.style.display = 'flex';
-            appStarted = true;
-        }, 500);
-    });
+// ----------------
+// start screen
+// ----------------
+startScreen.addEventListener('click', () => {
+    startScreen.style.opacity = '0';
+    setTimeout(() => {
+        startScreen.style.display = 'none';
+        mainUI.style.display = 'flex';
+        appStarted = true;
+    }, 400);
+});
 
-    // 写真選択
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+// ----------------
+// image select
+// ----------------
+fileInput.addEventListener('change', e => {
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
+const file = e.target.files[0];
+if (!file) return;
 
-            const img = new Image();
-            img.onload = () => {
+const reader = new FileReader();
 
-                const maxSide = 1024;
-                let w = img.width;
-                let h = img.height;
+reader.onload = ev => {
 
-                if (w > h && w > maxSide) {
-                    h *= maxSide / w;
-                    w = maxSide;
-                } else if (h > maxSide) {
-                    w *= maxSide / h;
-                    h = maxSide;
-                }
+const img = new Image();
 
-                const canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+img.onload = () => {
 
-                selectedImgUrl = canvas.toDataURL('image/jpeg', 0.8);
-                canPlace = true;
+let w = img.width;
+let h = img.height;
+const max = 1024;
 
-                fileLabel.innerText = "✅ 画面をタップ！";
-                fileLabel.style.background = "#2e7d32";
-            };
+if (w > h && w > max) {
+    h *= max / w;
+    w = max;
+} else if (h > max) {
+    w *= max / h;
+    h = max;
+}
 
-            img.src = event.target.result;
-        };
+const c = document.createElement('canvas');
+c.width = w;
+c.height = h;
+c.getContext('2d').drawImage(img,0,0,w,h);
 
-        reader.readAsDataURL(file);
-    });
+selectedImgUrl = c.toDataURL('image/jpeg',0.9);
+canPlace = true;
 
-    // 配置処理
-    const addPhotoToSpace = (e) => {
+fileLabel.innerText = "✅ 画面をタップ！";
+fileLabel.style.background="#2e7d32";
+};
 
-        if (!appStarted || e.target.closest('.ui-container')) return;
-        if (!selectedImgUrl || !canPlace) return;
+img.src = ev.target.result;
+};
 
-        const cameraObj = document.getElementById('myCamera').object3D;
-        const pos = new THREE.Vector3();
-        const dir = new THREE.Vector3();
+reader.readAsDataURL(file);
+});
 
-        cameraObj.getWorldPosition(pos);
-        cameraObj.getWorldDirection(dir);
+// ----------------
+// place photo
+// ----------------
+function addPhoto(e){
 
-        const plane = document.createElement('a-plane');
-        plane.setAttribute('material', 'side:double;shader:flat;transparent:true;');
+if(!appStarted || e.target.closest('.ui-container')) return;
+if(!selectedImgUrl || !canPlace) return;
 
-        const distance = 1.2;
+const cam = document.getElementById('myCamera').object3D;
 
-        plane.setAttribute('position', {
-            x: pos.x + dir.x * -distance,
-            y: pos.y + dir.y * -distance,
-            z: pos.z + dir.z * -distance
-        });
+const pos = new THREE.Vector3();
+const dir = new THREE.Vector3();
 
-        plane.setAttribute('look-at', '#myCamera');
+cam.getWorldPosition(pos);
+cam.getWorldDirection(dir);
 
-        const loader = new THREE.TextureLoader();
-        loader.load(selectedImgUrl, (texture) => {
+const plane = document.createElement('a-plane');
+plane.setAttribute('material','shader:flat;side:double;transparent:true');
 
-            const mesh = plane.getObject3D('mesh');
-            mesh.material.map = texture;
-            mesh.material.opacity = 1;
-            mesh.material.needsUpdate = true;
+const dist = 1.2;
 
-            const w = texture.image.width;
-            const h = texture.image.height;
-            const aspect = w / h;
+plane.setAttribute('position',{
+x: pos.x - dir.x * dist,
+y: pos.y - dir.y * dist,
+z: pos.z - dir.z * dist
+});
 
-            const maxSize = 0.25;
+scene.appendChild(plane);
 
-            if (aspect >= 1) {
-                plane.setAttribute('width', maxSize);
-                plane.setAttribute('height', maxSize / aspect);
-            } else {
-                plane.setAttribute('height', maxSize);
-                plane.setAttribute('width', maxSize * aspect);
-            }
-        });
+new THREE.TextureLoader().load(selectedImgUrl, tex => {
 
-        scene.appendChild(plane);
+const mesh = plane.getObject3D('mesh');
+mesh.material.map = tex;
+mesh.material.needsUpdate = true;
 
-        canPlace = false;
-        fileLabel.innerText = "① 写真を選ぶ";
-        fileLabel.style.background = "rgba(0,0,0,0.8)";
-    };
+const a = tex.image.width / tex.image.height;
+const size = 0.25;
 
-    window.addEventListener('mousedown', addPhotoToSpace);
-    window.addEventListener('touchstart', addPhotoToSpace);
+if(a>=1){
+plane.setAttribute('width',size);
+plane.setAttribute('height',size/a);
+}else{
+plane.setAttribute('height',size);
+plane.setAttribute('width',size*a);
+}
 
-    // 撮影処理（比率完全保持版）
-    shotBtn.addEventListener('click', async () => {
+// face camera once
+const cp = new THREE.Vector3();
+cam.getWorldPosition(cp);
+plane.object3D.lookAt(cp);
 
-    try {
+});
 
-        const video = document.querySelector('video');
-        const sceneCanvas = scene.components.screenshot.getCanvas('perspective');
+canPlace=false;
+fileLabel.innerText="① 写真を選ぶ";
+fileLabel.style.background="rgba(0,0,0,.8)";
+}
 
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
+window.addEventListener('mousedown',addPhoto);
+window.addEventListener('touchstart',addPhoto);
 
-        const finalCanvas = document.createElement("canvas");
-        finalCanvas.width = vw;
-        finalCanvas.height = vh;
+// ----------------
+// capture (NO distortion)
+// ----------------
+shotBtn.addEventListener('click', async ()=>{
 
-        const ctx = finalCanvas.getContext("2d");
+try{
 
-        // カメラ映像
-        ctx.drawImage(video, 0, 0, vw, vh);
+const video = document.querySelector('video');
+const glCanvas = scene.renderer.domElement;
 
-        // ===== ARキャンバスを同解像度へ正規化 =====
+const w = video.videoWidth;
+const h = video.videoHeight;
 
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = vw;
-        tempCanvas.height = vh;
+const canvas = document.createElement('canvas');
+canvas.width = w;
+canvas.height = h;
 
-        const tctx = tempCanvas.getContext('2d');
-        tctx.drawImage(sceneCanvas, 0, 0, vw, vh);
+const ctx = canvas.getContext('2d');
 
-        // ===== 完全一致合成 =====
+ctx.drawImage(video,0,0,w,h);
+ctx.drawImage(glCanvas,0,0,w,h);
 
-        ctx.drawImage(tempCanvas, 0, 0, vw, vh);
+const url = canvas.toDataURL('image/png');
 
-        const dataURL = finalCanvas.toDataURL('image/png');
+// flash
+const f=document.createElement('div');
+f.style.cssText='position:fixed;inset:0;background:white;z-index:9999';
+document.body.appendChild(f);
+setTimeout(()=>{f.style.opacity=0;setTimeout(()=>f.remove(),400)},50);
 
-        // フラッシュ
-        const flash = document.createElement('div');
-        flash.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:white;z-index:10001;';
-        document.body.appendChild(flash);
-        setTimeout(() => {
-            flash.style.transition = 'opacity 0.4s';
-            flash.style.opacity = '0';
-            setTimeout(() => flash.remove(), 400);
-        }, 50);
+if(navigator.share){
 
-        if (navigator.share && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
-            const blob = await (await fetch(dataURL)).blob();
-            const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
-            await navigator.share({ files: [file] }).catch(() => {});
-        } else {
-            const link = document.createElement('a');
-            link.download = `ar-${Date.now()}.png`;
-            link.href = dataURL;
-            link.click();
-        }
+const blob = await(await fetch(url)).blob();
+const file = new File([blob],`ar-${Date.now()}.png`,{type:'image/png'});
+await navigator.share({files:[file]}).catch(()=>{});
 
-    } catch (e) {
-        console.error(e);
-    }
-    });
+}else{
+
+const a=document.createElement('a');
+a.href=url;
+a.download=`ar-${Date.now()}.png`;
+a.click();
+
+}
+
+}catch(e){console.error(e);}
+
+});
+
 };
