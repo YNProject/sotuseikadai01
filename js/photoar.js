@@ -135,51 +135,17 @@ window.addEventListener('touchstart',addPhoto);
 // ----------------
 shotBtn.addEventListener('click', async () => {
     try {
-        const video = document.querySelector('video');
         const sceneEl = document.querySelector('a-scene');
+        
+        // A-Frameが画面描画に使っているCanvasを直接取得
+        // A-Frameは内部でカメラ映像も背景として描画しているため、
+        // このCanvasを保存すれば「見たまま」が手に入ります。
         const glCanvas = sceneEl.canvas; 
 
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
-        
-        // 保存用Canvas（カメラの生解像度）
-        const canvas = document.createElement('canvas');
-        canvas.width = vw;
-        canvas.height = vh;
-        const ctx = canvas.getContext('2d');
+        // 1. そのまま画像化（画面で見ているサイズ・比率になります）
+        const url = glCanvas.toDataURL('image/png');
 
-        // 1. カメラ映像をまずフルサイズで描画
-        ctx.drawImage(video, 0, 0, vw, vh);
-
-        // 2. ARレイヤーの重なりを計算
-        // ビデオがブラウザ画面内で実際に表示されている位置とサイズ（CSSピクセル）を取得
-        const vRect = video.getBoundingClientRect();
-        
-        // 画面のサイズ
-        const sw = window.innerWidth;
-        const sh = window.innerHeight;
-
-        // ビデオの表示倍率を計算（生データ vs 画面上の表示サイズ）
-        const scaleX = vw / vRect.width;
-        const scaleY = vh / vRect.height;
-
-        // ARのCanvas（画面全体）のうち、ビデオが表示されている領域に対応する部分だけを抽出
-        // tx, ty はビデオが画面からはみ出している（クロップされている）量
-        const tx = (vRect.left < 0) ? Math.abs(vRect.left) : 0;
-        const ty = (vRect.top < 0) ? Math.abs(vRect.top) : 0;
-
-        // 合成：
-        // 画面で見えているAR(glCanvas)を、ビデオのスケールに合わせて変形して重ねる
-        ctx.drawImage(
-            glCanvas, 
-            tx, ty, sw - Math.abs(vRect.left)*2, sh - Math.abs(vRect.top)*2, // ソース（画面の見える範囲）
-            0, 0, vw, vh // デスティネーション（ビデオ全域）
-        );
-
-        // --- 以下、保存・共有処理 ---
-        const url = canvas.toDataURL('image/png');
-
-        // フラッシュ演出
+        // --- フラッシュ演出 ---
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);
@@ -189,19 +155,20 @@ shotBtn.addEventListener('click', async () => {
             setTimeout(() => f.remove(), 400);
         }, 50);
 
+        // --- 保存・共有処理 ---
         if (navigator.share) {
             const blob = await (await fetch(url)).blob();
-            const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
+            const file = new File([blob], `ar-snap-${Date.now()}.png`, { type: 'image/png' });
             await navigator.share({ files: [file] }).catch(() => {});
         } else {
             const a = document.createElement('a');
             a.href = url;
-            a.download = `ar-${Date.now()}.png`;
+            a.download = `ar-snap-${Date.now()}.png`;
             a.click();
         }
 
     } catch (e) {
-        console.error("Capture Error:", e);
+        console.error("Screenshot Error:", e);
     }
 });
 };
