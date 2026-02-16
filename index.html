@@ -5,28 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>空間固定AR</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <style>
-        /* カメラ映像を一番奥に配置 */
-        #video-background {
-            position: fixed; top: 0; left: 0; min-width: 100%; min-height: 100%;
-            z-index: -1; object-fit: cover;
-        }
-        body { margin: 0; overflow: hidden; background: #000; }
-        #start-screen {
-            position: fixed; inset: 0; background: #000; color: #fff;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 10000; cursor: pointer;
-        }
-        .ui-container {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; display: none; gap: 10px; width: 90%; max-width: 400px;
-        }
-        .ui-btn {
-            flex: 1; padding: 15px 0; background: rgba(0,0,0,0.8); color: #fff;
-            border: 2px solid #fff; border-radius: 50px; text-align: center;
-            font-size: 14px; font-weight: bold; cursor: pointer;
-        }
-    </style>
+<style>
+    /* 既存のCSSに追加・修正 */
+    #video-background {
+        position: fixed; top: 0; left: 0; min-width: 100%; min-height: 100%;
+        z-index: -2; /* 一番奥 */
+        object-fit: cover;
+    }
+    
+    a-scene {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        z-index: 1; /* ビデオの上、UIの下 */
+        pointer-events: none; /* シーン自体はタップを貫通させる */
+    }
+
+    .ui-container {
+        position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+        z-index: 1000; display: none; gap: 10px; width: 90%; max-width: 400px;
+        pointer-events: auto; /* ボタンはタップできるように */
+    }
+</style>
 </head>
 <body>
 

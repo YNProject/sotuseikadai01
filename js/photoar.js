@@ -5,12 +5,11 @@ window.onload = async () => {
     const arWorld = document.getElementById('ar-world');
     const fileInput = document.getElementById('fileInput');
     const fileLabel = document.getElementById('fileLabel');
-    const sceneEl = document.querySelector('a-scene');
 
     let selectedImgUrl = null;
     let selectedAspect = 1;
 
-    // 1. カメラ起動
+    // カメラ起動
     async function startCamera() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -21,13 +20,12 @@ window.onload = async () => {
             startScreen.style.display = 'none';
             mainUI.style.display = 'flex';
         } catch (err) {
-            alert("カメラの起動に失敗しました: " + err);
+            alert("カメラ失敗: " + err);
         }
     }
-
     startScreen.addEventListener('click', startCamera);
 
-    // 2. 画像選択
+    // 画像選択
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -48,23 +46,22 @@ window.onload = async () => {
         reader.readAsDataURL(file);
     });
 
-    // 3. 配置処理（window全体のクリックで判定）
-    window.addEventListener('click', (e) => {
-        // UIボタンをクリックした場合は配置処理をスルー
+    // 配置処理
+    window.addEventListener('mousedown', (e) => { // touchよりも確実に拾うためmousedown
         if (!selectedImgUrl || e.target.closest('.ui-btn') || e.target.closest('#start-screen')) return;
 
         const cameraEntity = document.getElementById('myCamera');
         const cameraObj = cameraEntity.object3D;
         
-        // カメラの「現在の位置」と「向き」を取得
         const pos = new THREE.Vector3();
         const dir = new THREE.Vector3();
         cameraObj.getWorldPosition(pos);
         cameraObj.getWorldDirection(dir);
 
+        // 写真を作成
         const plane = document.createElement('a-plane');
         
-        // カメラの1.5m先に配置
+        // 1.5m先に配置（dirはカメラが向いている方向の逆ベクトルなので -dir にする）
         const dist = 1.5;
         const targetPos = {
             x: pos.x - dir.x * dist,
@@ -73,15 +70,18 @@ window.onload = async () => {
         };
 
         plane.setAttribute('position', targetPos);
-        // テクスチャを直接指定
-        plane.setAttribute('material', `shader:flat; side:double; transparent:true; src:url(${selectedImgUrl})`);
+        // マテリアルを確実に適用
+        plane.setAttribute('material', {
+            shader: 'flat',
+            src: selectedImgUrl,
+            transparent: true,
+            side: 'double'
+        });
         
-        // 配置時に自分（カメラ）の方を向かせる
-        // Y軸（高さ）を揃えることで、写真が斜めにならず直立します
+        // 高さを固定してカメラに向ける
         plane.object3D.lookAt(new THREE.Vector3(pos.x, targetPos.y, pos.z));
 
-        // サイズ計算
-        const size = 0.6;
+        const size = 0.8; // 少し大きくして見つけやすくする
         if (selectedAspect >= 1) {
             plane.setAttribute('width', size);
             plane.setAttribute('height', size / selectedAspect);
@@ -91,8 +91,10 @@ window.onload = async () => {
         }
 
         arWorld.appendChild(plane);
+        
+        // デバッグ用：配置した瞬間に少し色を変えるなどのフィードバックがあると良い
+        console.log("配置完了:", targetPos);
 
-        // リセット
         selectedImgUrl = null;
         fileLabel.innerText = "① 写真を選ぶ";
         fileLabel.style.background = "rgba(0,0,0,0.8)";
