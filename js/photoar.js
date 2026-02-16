@@ -137,61 +137,54 @@ shotBtn.addEventListener('click', async () => {
     try {
         const video = document.querySelector('video');
         const sceneEl = document.querySelector('a-scene');
-        // A-Frameのスクリーンショットコンポーネント
         const glCanvas = sceneEl.components.screenshot.getCanvas('perspective');
 
-        // 1. ビデオの解像度
         const vw = video.videoWidth;
         const vh = video.videoHeight;
-        const vAspect = vw / vh;
-
-        // 2. ブラウザで見ている画面のサイズ（CSSサイズ）
-        const windowW = window.innerWidth;
-        const windowH = window.innerHeight;
-        const screenAspect = windowW / windowH;
-
-        // 保存用キャンバスを作成（カメラ解像度に合わせる）
+        
+        // 保存用キャンバスをカメラの解像度で作成
         const canvas = document.createElement('canvas');
         canvas.width = vw;
         canvas.height = vh;
         const ctx = canvas.getContext('2d');
 
-        // --- 手順1: カメラ映像をそのまま描画 ---
+        // 1. カメラ映像をそのまま描画
         ctx.drawImage(video, 0, 0, vw, vh);
 
-        // --- 手順2: ARレイヤーをアスペクト比を維持して重ねる ---
-        // glCanvasは画面全体のサイズで描画されているため、
-        // カメラ映像（vw/vh）と同じ比率の部分だけを抽出します。
+        // 2. ARレイヤー（glCanvas）を「画面の見た目」に合わせて計算
+        // glCanvasはブラウザの描画領域サイズ（CSSサイズ）で出力されるため、
+        // 実際のビデオサイズ（vw, vh）との比率の差（歪み）を計算します。
         
-        let sWidth, sHeight, sx, sy;
+        const screenAspect = window.innerWidth / window.innerHeight;
+        const videoAspect = vw / vh;
 
-        // glCanvas側の比率
-        const gAspect = glCanvas.width / glCanvas.height;
+        let drawW, drawH, offsetX, offsetY;
 
-        if (gAspect > vAspect) {
-            // AR側が横に長い場合（左右をカット）
-            sHeight = glCanvas.height;
-            sWidth = glCanvas.height * vAspect;
-            sx = (glCanvas.width - sWidth) / 2;
-            sy = 0;
+        // AR.jsが「object-fit: cover」のようにカメラを表示していることを前提に計算
+        if (videoAspect > screenAspect) {
+            // ビデオの方が横長（スマホ縦持ちでよくあるケース）
+            drawH = vh;
+            drawW = vh * screenAspect;
+            offsetX = (vw - drawW) / 2;
+            offsetY = 0;
         } else {
-            // AR側が縦に長い場合（上下をカット）
-            sWidth = glCanvas.width;
-            sHeight = glCanvas.width / vAspect;
-            sx = 0;
-            sy = (glCanvas.height - sHeight) / 2;
+            // ビデオの方が縦長
+            drawW = vw;
+            drawH = vw / screenAspect;
+            offsetX = 0;
+            offsetY = (vh - drawH) / 2;
         }
 
-        // 描画：元画像の(sx, sy)から(sWidth, sHeight)の範囲を、
-        // 保存用キャンバスの(0, 0, vw, vh)にぴったり収める
-        ctx.drawImage(glCanvas, sx, sy, sWidth, sHeight, 0, 0, vw, vh);
+        // AR側（glCanvas）全体を、計算した「見えている範囲」にぴったり重ねる
+        // これにより、画面で見ている通りの比率に補正されます
+        ctx.drawImage(glCanvas, offsetX, offsetY, drawW, drawH);
 
-        // --- 手順3: 書き出し ---
+        // 3. 書き出し処理
         const url = canvas.toDataURL('image/png');
         
-        // フラッシュ（演出）
+        // フラッシュ演出
         const f = document.createElement('div');
-        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
+        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;opacity:1;';
         document.body.appendChild(f);
         setTimeout(() => {
             f.style.transition = 'opacity 0.4s';
@@ -199,7 +192,7 @@ shotBtn.addEventListener('click', async () => {
             setTimeout(() => f.remove(), 400);
         }, 50);
 
-        // 保存/共有
+        // 保存・共有
         if (navigator.share) {
             const blob = await (await fetch(url)).blob();
             const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
@@ -213,7 +206,6 @@ shotBtn.addEventListener('click', async () => {
 
     } catch (e) {
         console.error("Capture Error:", e);
-        alert("キャプチャに失敗しました。");
     }
 });
 };
