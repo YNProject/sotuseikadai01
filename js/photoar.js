@@ -88,7 +88,7 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
-    // 4. 保存ロジック（うまく動いていた時の構造を維持）
+    // 4. 【決定版】横伸び・横潰れを修正した保存ロジック
     shotBtn.addEventListener('click', () => {
         try {
             const video = document.querySelector('video');
@@ -97,6 +97,8 @@ window.onload = () => {
             // 再描画を強制して最新状態をCanvasに送る
             scene.renderer.render(scene.object3D, scene.camera);
 
+            // 【ここがポイント】
+            // window.innerWidthではなく、ビデオ要素が実際に画面を占めているサイズ(CSS)を基準にする
             const vWidth = video.clientWidth;
             const vHeight = video.clientHeight;
 
@@ -104,12 +106,14 @@ window.onload = () => {
             const vw = video.videoWidth;
             const vh = video.videoHeight;
 
+            // 保存用のキャンバス。
+            // 縦横比を「プレビューで見ているビデオの比率」に完全に合わせる
             const canvas = document.createElement('canvas');
             canvas.width = vWidth;
             canvas.height = vHeight;
             const ctx = canvas.getContext('2d');
 
-            // --- 【ここが修正ポイント】カメラ映像を中央から切り抜く計算 ---
+            // クロップ計算（Cover設定）
             const videoAspect = vw / vh;
             const screenAspect = vWidth / vHeight;
             let sx, sy, sWidth, sHeight;
@@ -128,10 +132,11 @@ window.onload = () => {
                 sy = (vh - sHeight) / 2;
             }
 
-            // 背景（カメラ）を描画：切り抜き(sx, sy, sWidth, sHeight)を適用
+            // 背景（カメラ）を描画
             ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, vWidth, vHeight);
             
             // AR（ラーメンなど）を描画
+            // 画面サイズ(vWidth, vHeight)に引き伸ばしてピッタリ重ねる
             ctx.drawImage(glCanvas, 0, 0, vWidth, vHeight);
 
             const url = canvas.toDataURL('image/png');
@@ -142,7 +147,6 @@ window.onload = () => {
         }
     });
 
-    // 5. 保存実行関数（元の位置に配置）
     async function saveImage(url) {
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
@@ -155,7 +159,7 @@ window.onload = () => {
                 const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
                 await navigator.share({ files: [file] });
             } catch (e) {
-                // キャンセル時
+                // キャンセル時などは何もしない
             }
         } else {
             const a = document.createElement('a');
