@@ -3,31 +3,44 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WebXR写真AR</title>
+    <title>WebXR 写真AR</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* CSSをここに直接書くと読み込み順による崩れを防げます */
+        body { margin: 0; overflow: hidden; background: #000; }
+        .ui-container {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            z-index: 99999; display: flex; gap: 10px; width: 90%; max-width: 400px;
+            visibility: hidden; /* 最初は隠す */
+        }
+        button, label {
+            padding: 15px 5px; background: rgba(0,0,0,0.8); color: white;
+            border-radius: 50px; border: 2px solid white; flex: 1; 
+            text-align: center; font-size: 12px; cursor: pointer;
+        }
+        #start-screen {
+            position: fixed; inset: 0; background: #000; color: white;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100000;
+        }
+    </style>
 </head>
-<body style="margin:0; overflow:hidden;">
+<body>
 
     <div id="start-screen">
         <h1>WebXR 写真AR</h1>
-        <p>タップしてスタート</p>
+        <p>タップしてAR開始</p>
     </div>
 
     <div class="ui-container" id="main-ui">
         <input type="file" id="fileInput" accept="image/*" style="display:none">
-        <label for="fileInput" id="fileLabel">① 写真を選ぶ</label>
-        <button id="shotBtn" type="button">② 写真を撮る</button>
+        <label for="fileInput" id="fileLabel">① 写真選ぶ</label>
+        <button id="shotBtn">② 写真撮る</button>
     </div>
 
-    <a-scene 
-        webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #main-ui;"
-        renderer="preserveDrawingBuffer: true; alpha: true;">
-        
-        <a-entity id="myCamera" camera look-controls></a-entity>
-        
+    <a-scene webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #main-ui;">
+        <a-entity id="myCamera" camera position="0 1.6 0"></a-entity>
         <a-entity id="ar-world"></a-entity>
-
     </a-scene>
 
     <script src="js/photoar.js"></script>
