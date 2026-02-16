@@ -90,28 +90,40 @@ window.onload = () => {
 
     // 4. 【決定版】横伸び・横潰れを修正した保存ロジック
 // 4. 【修正版】解像度と比率を完全に維持する保存ロジック
+// 4. 【決定版】エラー対策と解像度調整を両立したロジック
     shotBtn.addEventListener('click', () => {
         try {
             const video = document.querySelector('video');
-            const glCanvas = scene.canvas;
+            const glCanvas = scene.canvas; // A-Frameの描画用Canvas
 
-            // A-Frameのレンダラーで最新状態を確定させる
-            scene.renderer.render(scene.object3D, scene.camera);
+            // CanvasやVideoが取得できていない場合は何もしない
+            if (!glCanvas || !video) {
+                console.error("Canvas or Video not found");
+                return;
+            }
 
-            // 【重要】保存用キャンバスのサイズを、AR描画側の実解像度に合わせる
+            // A-Frameのレンダラーが存在するか確認して再描画
+            if (scene.renderer) {
+                scene.renderer.render(scene.object3D, scene.camera);
+            }
+
+            // 保存用の作業キャンバスを作成
             const canvas = document.createElement('canvas');
+            // 解像度ズレを防ぐため、AR側の実サイズを優先
             canvas.width = glCanvas.width;
             canvas.height = glCanvas.height;
             const ctx = canvas.getContext('2d');
 
-            // ビデオの元データ解像度と、ARキャンバスの比率
+            // ビデオの元データ解像度
             const vw = video.videoWidth;
             const vh = video.videoHeight;
+            
+            // ビデオが表示されている「画面上の比率」を計算
+            // video.clientWidthではなく、glCanvasの比率に合わせるのが確実
             const targetAspect = canvas.width / canvas.height;
-
-            // ビデオをキャンバス（ARの比率）に合わせてクロップ（Cover）描画する計算
-            let sx, sy, sWidth, sHeight;
             const videoAspect = vw / vh;
+
+            let sx, sy, sWidth, sHeight;
 
             if (videoAspect > targetAspect) {
                 // ビデオが横長すぎる場合：左右をカット
@@ -127,16 +139,19 @@ window.onload = () => {
                 sy = (vh - sHeight) / 2;
             }
 
-            // 1. 背景カメラ映像を描画
+            // 1. 背景カメラ映像を先に描画
             ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
             
-            // 2. AR（写真）を描画（サイズが一致しているのでそのまま重ねる）
+            // 2. AR（ラーメンなど）を上から重ねる
             ctx.drawImage(glCanvas, 0, 0, canvas.width, canvas.height);
 
+            // 保存処理へ
             const url = canvas.toDataURL('image/png');
             saveImage(url);
 
         } catch (e) {
+            // エラーの内容をアラートで表示（デバッグ用）
+            alert("エラーが発生しました: " + e.message);
             console.error("Capture failed:", e);
         }
     });
