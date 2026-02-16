@@ -47,43 +47,55 @@ window.onload = () => {
     });
 
     function addPhoto(e) {
-        if (!appStarted || e.target.closest('.ui-container')) return;
-        if (!selectedImgUrl || !canPlace) return;
+    if (!appStarted || e.target.closest('.ui-container')) return;
+    if (!selectedImgUrl || !canPlace) return;
 
-        const camObj = document.getElementById('myCamera').object3D;
-        const pos = new THREE.Vector3();
-        const dir = new THREE.Vector3();
-        camObj.getWorldPosition(pos);
-        camObj.getWorldDirection(dir);
+    // 1. カメラの「現在の位置」と「向いている方向」を取得
+    const camObj = document.getElementById('myCamera').object3D;
+    const worldPos = new THREE.Vector3();
+    const worldDir = new THREE.Vector3();
+    
+    camObj.getWorldPosition(worldPos);
+    camObj.getWorldDirection(worldDir);
 
-        const plane = document.createElement('a-plane');
-        plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
-        const dist = 1.2;
-        plane.setAttribute('position', {
-            x: pos.x - dir.x * dist,
-            y: pos.y - dir.y * dist,
-            z: pos.z - dir.z * dist
-        });
-        scene.appendChild(plane);
+    // 2. 配置する座標を計算（カメラの1.2m前方）
+    const dist = 1.2;
+    const targetX = worldPos.x - worldDir.x * dist;
+    const targetY = worldPos.y - worldDir.y * dist;
+    const targetZ = worldPos.z - worldDir.z * dist;
 
-        new THREE.TextureLoader().load(selectedImgUrl, tex => {
-            const mesh = plane.getObject3D('mesh');
-            mesh.material.map = tex;
-            mesh.material.needsUpdate = true;
-            const size = 0.2;
-            if (selectedAspect >= 1) {
-                plane.setAttribute('width', size);
-                plane.setAttribute('height', size / selectedAspect);
-            } else {
-                plane.setAttribute('height', size);
-                plane.setAttribute('width', size * selectedAspect);
-            }
-            plane.object3D.lookAt(pos);
-        });
-        canPlace = false;
-        fileLabel.innerText = "① 写真を選ぶ";
-        fileLabel.style.background = "rgba(0,0,0,.8)";
-    }
+    // 3. 写真（a-plane）を作成
+    const plane = document.createElement('a-plane');
+    plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
+    
+    // 重要：位置を「シーンの固定座標」として設定
+    plane.setAttribute('position', { x: targetX, y: targetY, z: targetZ });
+
+    // 4. 配置後にカメラの方を向かせる（一度きりの実行）
+    plane.object3D.lookAt(worldPos);
+
+    // 5. シーン（a-scene）の直下に追加（カメラの中に入れない）
+    scene.appendChild(plane);
+
+    // テクスチャの読み込みとサイズ設定
+    new THREE.TextureLoader().load(selectedImgUrl, tex => {
+        const mesh = plane.getObject3D('mesh');
+        mesh.material.map = tex;
+        mesh.material.needsUpdate = true;
+        const size = 0.5;
+        if (selectedAspect >= 1) {
+            plane.setAttribute('width', size);
+            plane.setAttribute('height', size / selectedAspect);
+        } else {
+            plane.setAttribute('height', size);
+            plane.setAttribute('width', size * selectedAspect);
+        }
+    });
+
+    canPlace = false;
+    fileLabel.innerText = "① 写真を選ぶ";
+    fileLabel.style.background = "rgba(0,0,0,.8)";
+}
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, { passive: false });
 
