@@ -137,49 +137,47 @@ shotBtn.addEventListener('click', async () => {
     try {
         const video = document.querySelector('video');
         const sceneEl = document.querySelector('a-scene');
+        // A-Frame側のCanvasを取得
         const glCanvas = sceneEl.components.screenshot.getCanvas('perspective');
 
         const vw = video.videoWidth;
         const vh = video.videoHeight;
         
-        // 保存用キャンバスをカメラの解像度で作成
+        // 1. 出力用のCanvasをカメラの解像度で作成
         const canvas = document.createElement('canvas');
         canvas.width = vw;
         canvas.height = vh;
         const ctx = canvas.getContext('2d');
 
-        // 1. カメラ映像をそのまま描画
+        // 2. カメラ映像をまず描画
         ctx.drawImage(video, 0, 0, vw, vh);
 
-        // 2. ARレイヤー（glCanvas）を「画面の見た目」に合わせて計算
-        // glCanvasはブラウザの描画領域サイズ（CSSサイズ）で出力されるため、
-        // 実際のビデオサイズ（vw, vh）との比率の差（歪み）を計算します。
-        
+        // 3. ARレイヤー（glCanvas）を重ねる
+        // ここがポイント：画面の見た目とビデオの比率の「ズレ」を、
+        // glCanvas側の描画位置を調整することで解消します。
         const screenAspect = window.innerWidth / window.innerHeight;
         const videoAspect = vw / vh;
 
-        let drawW, drawH, offsetX, offsetY;
+        let scale, tx, ty;
 
-        // AR.jsが「object-fit: cover」のようにカメラを表示していることを前提に計算
         if (videoAspect > screenAspect) {
-            // ビデオの方が横長（スマホ縦持ちでよくあるケース）
-            drawH = vh;
-            drawW = vh * screenAspect;
-            offsetX = (vw - drawW) / 2;
-            offsetY = 0;
+            // ビデオが横長の場合（左右をビデオの幅に合わせる）
+            scale = vw / glCanvas.width;
+            tx = 0;
+            ty = (vh - glCanvas.height * scale) / 2;
         } else {
-            // ビデオの方が縦長
-            drawW = vw;
-            drawH = vw / screenAspect;
-            offsetX = 0;
-            offsetY = (vh - drawH) / 2;
+            // ビデオが縦長の場合（上下をビデオの高さに合わせる）
+            scale = vh / glCanvas.height;
+            tx = (vw - glCanvas.width * scale) / 2;
+            ty = 0;
         }
 
-        // AR側（glCanvas）全体を、計算した「見えている範囲」にぴったり重ねる
-        // これにより、画面で見ている通りの比率に補正されます
-        ctx.drawImage(glCanvas, offsetX, offsetY, drawW, drawH);
+        // 変形を適用して描画
+        ctx.setTransform(scale, 0, 0, scale, tx, ty);
+        ctx.drawImage(glCanvas, 0, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0); // リセット
 
-        // 3. 書き出し処理
+        // --- 以下保存処理 ---
         const url = canvas.toDataURL('image/png');
         
         // フラッシュ演出
@@ -192,20 +190,17 @@ shotBtn.addEventListener('click', async () => {
             setTimeout(() => f.remove(), 400);
         }, 50);
 
-        // 保存・共有
         if (navigator.share) {
             const blob = await (await fetch(url)).blob();
             const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
             await navigator.share({ files: [file] }).catch(() => {});
         } else {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `ar-${Date.now()}.png`;
-            a.click();
+            const a = document.createElement('a'); a.href = url;
+            a.download = `ar-${Date.now()}.png`; a.click();
         }
 
     } catch (e) {
-        console.error("Capture Error:", e);
+        console.error(e);
     }
 });
 };
