@@ -6,29 +6,29 @@
     <title>空間固定AR</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <style>
-        /* 背景を透過させ、カメラ映像を隠さないようにする */
         body { margin: 0; overflow: hidden; background: transparent; }
         
+        /* スタート画面 */
         #start-screen {
             position: fixed; inset: 0; background: #000; color: #fff;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 10000; cursor: pointer;
         }
 
+        /* UI：AR.jsの時と同じデザイン */
         .ui-container {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            z-index: 999; display: flex; gap: 10px; width: 90%; max-width: 400px;
-            pointer-events: none;
+            z-index: 999; display: none; gap: 10px; width: 90%; max-width: 400px;
         }
 
         .ui-btn {
             flex: 1; padding: 15px 0; background: rgba(0, 0, 0, 0.8); color: white;
             border: 2px solid white; border-radius: 50px; text-align: center;
-            font-size: 14px; font-weight: bold; cursor: pointer; pointer-events: auto;
+            font-size: 14px; font-weight: bold; cursor: pointer; text-decoration: none;
         }
 
-        /* VRモードのボタンや余計なUIを完全に消去 */
-        .a-enter-vr { display: none !important; }
+        /* VR/ARボタンを強制非表示 */
+        .a-enter-vr, .a-enter-ar { display: none !important; }
     </style>
 </head>
 <body>
@@ -46,11 +46,9 @@
 
     <a-scene 
         webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #main-ui;"
-        vr-mode-ui="enabled: false;"
-        device-orientation-permission-ui="enabled: false"
-        renderer="alpha: true; antialias: true; logarithmicDepthBuffer: true;">
+        vr-mode-ui="enabled: false">
         
-        <a-entity id="myCamera" camera position="0 1.6 0" look-controls></a-entity>
+        <a-entity id="myCamera" camera look-controls position="0 1.6 0"></a-entity>
         <a-entity id="ar-world"></a-entity>
     </a-scene>
 

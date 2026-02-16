@@ -4,18 +4,20 @@ window.onload = () => {
     const fileInput = document.getElementById('fileInput');
     const fileLabel = document.getElementById('fileLabel');
     const startScreen = document.getElementById('start-screen');
+    const mainUI = document.getElementById('main-ui');
 
     let selectedImgUrl = null;
     let selectedAspect = 1;
 
-    // 1. 開始処理：即座にWebXR(AR)を開始
+    // 1. 開始処理（VRをスキップしてARを強制）
     startScreen.addEventListener('click', () => {
-        // A-FrameのXRセッションを「AR」として開始
-        scene.enterVR(); // WebXRではこのメソッドがAR起動を兼ねます
+        // VRモードを経由せず、直接WebXRのARセッションを要求
+        scene.enterVR(); 
         startScreen.style.display = 'none';
+        mainUI.style.display = 'flex';
     });
 
-    // 2. 画像選択（変更なし）
+    // 2. 画像選択
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -36,33 +38,29 @@ window.onload = () => {
         reader.readAsDataURL(file);
     });
 
-    // 3. 配置処理
+    // 3. 空間配置
     scene.addEventListener('click', (e) => {
         if (!selectedImgUrl || e.target.closest('.ui-btn')) return;
 
-        const camObj = document.getElementById('myCamera').object3D;
+        const camera = document.getElementById('myCamera').object3D;
         const pos = new THREE.Vector3();
         const dir = new THREE.Vector3();
-        
-        // カメラの正確な位置を算出
-        camObj.getWorldPosition(pos);
-        camObj.getWorldDirection(dir);
+        camera.getWorldPosition(pos);
+        camera.getWorldDirection(dir);
 
         const plane = document.createElement('a-plane');
-        
-        // 1.2m先に固定
         const dist = 1.2;
-        const planePos = {
+        const targetPos = {
             x: pos.x - dir.x * dist,
             y: pos.y - dir.y * dist,
             z: pos.z - dir.z * dist
         };
 
-        plane.setAttribute('position', planePos);
+        plane.setAttribute('position', targetPos);
         plane.setAttribute('material', 'shader:flat;side:double;transparent:true;src:' + selectedImgUrl);
         
-        // 写真を直立させ、自分の方を向かせる
-        plane.object3D.lookAt(new THREE.Vector3(pos.x, planePos.y, pos.z));
+        // 直立してカメラを向く
+        plane.object3D.lookAt(new THREE.Vector3(pos.x, targetPos.y, pos.z));
 
         const size = 0.5;
         if (selectedAspect >= 1) {
@@ -74,7 +72,6 @@ window.onload = () => {
         }
 
         arWorld.appendChild(plane);
-
         selectedImgUrl = null;
         fileLabel.innerText = "① 写真を選ぶ";
         fileLabel.style.background = "rgba(0,0,0,0.8)";
