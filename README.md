@@ -1,31 +1,26 @@
-# ①写真AR
-
-- 
+# ①写真AR写真
+ 
 ![Game Image](./img/photoar01.png)
 
 ## ②説明
 - 撮った写真をARとして表示してそれを写真にとれるアプリです。
+- 飲食店で料理を撮って店を出たらその外観と合わせてさっきの料理の写真をARで出して、それを写真にする。というものです。
 
 ## ③アプリのデプロイURL
-ログイン：　https://yugames.sakura.ne.jp/php04kadai/login.php<br>
+https://yugames.sakura.ne.jp/photo-ar/
 
 ## ④アプリのログイン用IDまたはPassword（ある場合）
-管理者(編集、削除あり)
-- ID: test1
-- PASS: test1
-
-一般(編集、削除なし)
-- ID: test2
-- PASS: test2
+なし
 
 ## ⑤工夫した点・こだわった点
-- configファイルの扱いに気をつけました（configファイルをgitignoreでgithubに上げない、wwwと違う階層におく）
-- 管理者かどうかで更新、削除ができる権限を分けました
+- プレイ中にどんどん重くならないようにAR化する写真の画質を落とすなど、体験のしやすさに関わる調整を考えながら進めているところ、（アップロード上限はまだ入れてないです）
 
 ## ⑥難しかった点・次回トライしたいこと（又は機能）
-- 参照する階層を書くのが難しい。ファイルの数が増えたり、フォルダわけが増えたりするとミスが増えてしまいます。
+- WebARでできることとか、制約とかを探りながら進めてます。
+- 
 
 ## ⑦フリー項目（感想、シェアしたいこと等なんでも）
-- プレイイメージです
+プレイ動画
 
-https://github.com/user-attachments/assets/4b5fa4ff-45dd-455b-bae5-c6bf71ea9fca
+https://github.com/user-attachments/assets/0b831aaa-db60-49d9-b06f-8bae49b6ca4c
+
