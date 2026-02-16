@@ -5,17 +5,28 @@ body {
     background-color: #000;
 }
 
-/* 2. ビデオ映像とARキャンバス：右側の黒帯を物理的に上書き */
-/* widthを 100% ではなく 100vw(画面幅いっぱい) に強制します */
+/* 2. ビデオ映像とARキャンバス：黒帯を消すための最終設定 */
 video, .a-canvas {
+    /* 画面サイズを強制 */
     width: 100vw !important;
     height: 100vh !important;
-    object-fit: cover !important; /* 隙間なく埋める */
     
-    /* 位置を左上に強制固定 */
+    /* 隙間を埋める（はみ出させてでも埋める） */
+    object-fit: cover !important;
+    
+    /* AR.jsが計算で入れる inline-style を無効化して左上に固定 */
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
+    margin: 0 !important;
+    
+    /* 拡大時にボケないよう調整 */
+    image-rendering: auto; 
+}
+
+/* ビデオ要素だけ少し拡大して確実に隙間を殺す設定（保険） */
+video {
+    transform: scale(1.01); /* 1%だけ大きくして端の1pxの隙間を消す */
 }
 
 /* 3. A-Frameの描画エリアがビデオより下に行かないようにする */
