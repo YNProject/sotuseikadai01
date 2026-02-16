@@ -90,69 +90,50 @@ window.onload = () => {
 
     // 4. 【決定版】横伸び・横潰れを修正した保存ロジック
 // 4. 【修正版】解像度と比率を完全に維持する保存ロジック
-// 4. 【決定版】エラー対策と解像度調整を両立したロジック
+// 4. 【動作優先】エラーを防ぎつつ保存するロジック
     shotBtn.addEventListener('click', () => {
+        console.log("ボタンが押されました"); // デバッグ用
+        
         try {
             const video = document.querySelector('video');
-            const glCanvas = scene.canvas; // A-Frameの描画用Canvas
+            const sceneEl = document.querySelector('a-scene'); // 直接取得
+            const glCanvas = sceneEl ? sceneEl.canvas : null;
 
-            // CanvasやVideoが取得できていない場合は何もしない
-            if (!glCanvas || !video) {
-                console.error("Canvas or Video not found");
+            if (!video) {
+                alert("カメラ映像が見つかりません。");
+                return;
+            }
+            if (!glCanvas) {
+                alert("AR描画の準備ができていません。もう一度試してください。");
                 return;
             }
 
-            // A-Frameのレンダラーが存在するか確認して再描画
-            if (scene.renderer) {
-                scene.renderer.render(scene.object3D, scene.camera);
-            }
+            // A-Frameの描画を強制更新（バッファ読み取り用）
+            sceneEl.renderer.render(sceneEl.object3D, sceneEl.camera);
 
-            // 保存用の作業キャンバスを作成
             const canvas = document.createElement('canvas');
-            // 解像度ズレを防ぐため、AR側の実サイズを優先
-            canvas.width = glCanvas.width;
-            canvas.height = glCanvas.height;
+            
+            // ズレを最小限にするため、一旦ビデオの表示サイズに合わせる
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
             const ctx = canvas.getContext('2d');
 
-            // ビデオの元データ解像度
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
+            // 1. カメラ映像を全画面描画
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // ビデオが表示されている「画面上の比率」を計算
-            // video.clientWidthではなく、glCanvasの比率に合わせるのが確実
-            const targetAspect = canvas.width / canvas.height;
-            const videoAspect = vw / vh;
-
-            let sx, sy, sWidth, sHeight;
-
-            if (videoAspect > targetAspect) {
-                // ビデオが横長すぎる場合：左右をカット
-                sWidth = vh * targetAspect;
-                sHeight = vh;
-                sx = (vw - sWidth) / 2;
-                sy = 0;
-            } else {
-                // ビデオが縦長すぎる場合：上下をカット
-                sWidth = vw;
-                sHeight = vw / targetAspect;
-                sx = 0;
-                sy = (vh - sHeight) / 2;
-            }
-
-            // 1. 背景カメラ映像を先に描画
-            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
-            
-            // 2. AR（ラーメンなど）を上から重ねる
+            // 2. AR写真を重ねる
+            // glCanvasをビデオのサイズに合わせて引き伸ばして描画
             ctx.drawImage(glCanvas, 0, 0, canvas.width, canvas.height);
 
-            // 保存処理へ
             const url = canvas.toDataURL('image/png');
+            console.log("画像生成成功");
             saveImage(url);
 
         } catch (e) {
-            // エラーの内容をアラートで表示（デバッグ用）
             alert("エラーが発生しました: " + e.message);
-            console.error("Capture failed:", e);
+            console.error(e);
         }
     });
 };
