@@ -10,7 +10,7 @@ window.onload = () => {
     let canPlace = false;
     let appStarted = false;
 
-    // スタート画面
+    // 1. スタート画面制御
     startScreen.addEventListener('click', () => {
         startScreen.style.opacity = '0';
         setTimeout(() => {
@@ -20,7 +20,7 @@ window.onload = () => {
         }, 400);
     });
 
-    // 画像選択
+    // 2. 画像選択・リサイズ
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -46,7 +46,7 @@ window.onload = () => {
         reader.readAsDataURL(file);
     });
 
-    // AR配置
+    // 3. AR平面の配置
     function addPhoto(e) {
         if (!appStarted || e.target.closest('.ui-container')) return;
         if (!selectedImgUrl || !canPlace) return;
@@ -88,65 +88,84 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
-    // 【修正版】真っ暗にならない保存ロジック
+    // 4. 【決定版】横伸び・横潰れを修正した保存ロジック
     shotBtn.addEventListener('click', () => {
         try {
             const video = document.querySelector('video');
-            const glCanvas = scene.canvas; // scene.components.screenshotを使わず直接Canvasを取得
+            const glCanvas = scene.canvas;
 
-            // A-Frameに現在のフレームを強制描画（真っ黒回避）
+            // 再描画を強制して最新状態をCanvasに送る
             scene.renderer.render(scene.object3D, scene.camera);
 
+            // 【ここがポイント】
+            // window.innerWidthではなく、ビデオ要素が実際に画面を占めているサイズ(CSS)を基準にする
+            const vWidth = video.clientWidth;
+            const vHeight = video.clientHeight;
+
+            // ビデオの元データ解像度
             const vw = video.videoWidth;
             const vh = video.videoHeight;
-            const sw = window.innerWidth;
-            const sh = window.innerHeight;
 
+            // 保存用のキャンバス。
+            // 縦横比を「プレビューで見ているビデオの比率」に完全に合わせる
             const canvas = document.createElement('canvas');
-            canvas.width = sw;
-            canvas.height = sh;
+            canvas.width = vWidth;
+            canvas.height = vHeight;
             const ctx = canvas.getContext('2d');
 
-            // 1. カメラ映像のクロップ計算
+            // クロップ計算（Cover設定）
             const videoAspect = vw / vh;
-            const screenAspect = sw / sh;
+            const screenAspect = vWidth / vHeight;
             let sx, sy, sWidth, sHeight;
 
             if (videoAspect > screenAspect) {
-                sWidth = vh * screenAspect; sHeight = vh;
-                sx = (vw - sWidth) / 2; sy = 0;
+                // ビデオの方が横長（左右を削る）
+                sWidth = vh * screenAspect;
+                sHeight = vh;
+                sx = (vw - sWidth) / 2;
+                sy = 0;
             } else {
-                sWidth = vw; sHeight = vw / screenAspect;
-                sx = 0; sy = (vh - sHeight) / 2;
+                // ビデオの方が縦長（上下を削る）
+                sWidth = vw;
+                sHeight = vw / screenAspect;
+                sx = 0;
+                sy = (vh - sHeight) / 2;
             }
 
-            // カメラを描画
-            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, sw, sh);
-            // ARを描画 (scene.canvasをそのまま使用)
-            ctx.drawImage(glCanvas, 0, 0, sw, sh);
+            // 背景（カメラ）を描画
+            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, vWidth, vHeight);
+            
+            // AR（ラーメンなど）を描画
+            // 画面サイズ(vWidth, vHeight)に引き伸ばしてピッタリ重ねる
+            ctx.drawImage(glCanvas, 0, 0, vWidth, vHeight);
 
             const url = canvas.toDataURL('image/png');
-            
-            // 保存・共有
             saveImage(url);
 
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error("Capture failed:", e);
+        }
     });
 
     async function saveImage(url) {
-        // フラッシュ演出
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);
         setTimeout(() => { f.style.transition='opacity .4s'; f.style.opacity=0; setTimeout(()=>f.remove(),400); }, 50);
 
         if (navigator.share) {
-            const blob = await (await fetch(url)).blob();
-            const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
-            await navigator.share({ files: [file] }).catch(() => {});
+            try {
+                const blob = await (await fetch(url)).blob();
+                const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
+                await navigator.share({ files: [file] });
+            } catch (e) {
+                // キャンセル時などは何もしない
+            }
         } else {
             const a = document.createElement('a');
-            a.href = url; a.download = `ar-${Date.now()}.png`; a.click();
+            a.href = url;
+            a.download = `ar-${Date.now()}.png`;
+            a.click();
         }
     }
 };
