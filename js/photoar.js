@@ -168,4 +168,5 @@ window.onload = () => {
             a.click();
         }
     }
+
 };
