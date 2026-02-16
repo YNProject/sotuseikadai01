@@ -11,7 +11,7 @@ window.onload = () => {
     let canPlace = false;
     let appStarted = false;
 
-    // 1. スタート画面制御
+    // 1. スタート画面
     startScreen.addEventListener('click', () => {
         startScreen.style.opacity = '0';
         setTimeout(() => {
@@ -21,7 +21,7 @@ window.onload = () => {
         }, 400);
     });
 
-    // 2. 画像選択・リサイズ
+    // 2. 写真の読み込み
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -56,7 +56,6 @@ window.onload = () => {
         const camObj = document.getElementById('myCamera').object3D;
         const pos = new THREE.Vector3();
         const dir = new THREE.Vector3();
-
         camObj.getWorldPosition(pos);
         camObj.getWorldDirection(dir);
 
@@ -68,14 +67,12 @@ window.onload = () => {
             y: pos.y - dir.y * dist,
             z: pos.z - dir.z * dist
         });
-
         scene.appendChild(plane);
 
         new THREE.TextureLoader().load(selectedImgUrl, tex => {
             const mesh = plane.getObject3D('mesh');
             mesh.material.map = tex;
             mesh.material.needsUpdate = true;
-
             const size = 0.5;
             if (selectedAspect >= 1) {
                 plane.setAttribute('width', size);
@@ -91,18 +88,17 @@ window.onload = () => {
         fileLabel.innerText = "① 写真を選ぶ";
         fileLabel.style.background = "rgba(0,0,0,.8)";
     }
-
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, { passive: false });
 
-    // 4. 保存ロジック（ここが最重要修正）
+    // 4. 【決定版】保存ロジック：見たままキャプチャ
     shotBtn.addEventListener('click', async () => {
         try {
             const video = document.querySelector('video');
             const glCanvas = scene.canvas;
             if (!video || !glCanvas) return;
 
-            // 「ブラウザで見えているそのままのサイズ」を保存用キャンバスの大きさにする
+            // 画面の「見た目」のサイズ（CSSピクセル）でキャンバスを作成
             const outWidth = window.innerWidth;
             const outHeight = window.innerHeight;
 
@@ -111,8 +107,7 @@ window.onload = () => {
             canvas.height = outHeight;
             const ctx = canvas.getContext('2d');
 
-            // --- 1. ビデオレイヤーの描画 ---
-            // ビデオ要素の表示スタイルを取得
+            // --- 1. ビデオ（背景）を「今の見た目」に切り抜いて描画 ---
             const vw = video.videoWidth;
             const vh = video.videoHeight;
             const videoAspect = vw / vh;
@@ -132,15 +127,12 @@ window.onload = () => {
             }
             ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, outWidth, outHeight);
 
-            // --- 2. ARレイヤーの描画 ---
-            // A-Frameの最新をレンダリング
+            // --- 2. AR（glCanvas）を「今の見た目」にリサイズして重ねる ---
             scene.renderer.render(scene.object3D, scene.camera);
-            
-            // 重要：glCanvasの「中身」だけを、今の画面サイズに合わせて「リサイズして」重ねる
-            // これにより、ARが細長くなる歪みが物理的に解消されます
+            // ここで引数にoutWidth, outHeightを指定することで歪みを強制補正
             ctx.drawImage(glCanvas, 0, 0, outWidth, outHeight);
 
-            // 5. 保存（JPEG 画質0.8で軽量化）
+            // --- 3. 軽量なJPEGで保存 ---
             const url = canvas.toDataURL('image/jpeg', 0.8);
             saveImage(url);
 
@@ -150,6 +142,7 @@ window.onload = () => {
     });
 
     async function saveImage(url) {
+        // フラッシュ演出
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);

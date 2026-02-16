@@ -20,7 +20,7 @@ button, label {
     display: flex; align-items: center; justify-content: center;
 }
 
-/* キャンバスを画面ピッタリに、かつ歪ませない設定 */
+/* キャンバスをCSSピクセルベースで固定 */
 .a-canvas {
     width: 100vw !important;
     height: 100vh !important;
