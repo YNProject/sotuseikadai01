@@ -90,50 +90,60 @@ window.onload = () => {
 
     // 4. 【決定版】横伸び・横潰れを修正した保存ロジック
 // 4. 【修正版】解像度と比率を完全に維持する保存ロジック
-// 4. 【動作優先】エラーを防ぎつつ保存するロジック
+// 4. 【修正版】動作実績のあるコードをベースに比率だけ正す
     shotBtn.addEventListener('click', () => {
-        console.log("ボタンが押されました"); // デバッグ用
-        
         try {
             const video = document.querySelector('video');
-            const sceneEl = document.querySelector('a-scene'); // 直接取得
-            const glCanvas = sceneEl ? sceneEl.canvas : null;
+            const glCanvas = scene.canvas;
 
-            if (!video) {
-                alert("カメラ映像が見つかりません。");
-                return;
-            }
-            if (!glCanvas) {
-                alert("AR描画の準備ができていません。もう一度試してください。");
-                return;
-            }
+            if (!video || !glCanvas) return;
 
-            // A-Frameの描画を強制更新（バッファ読み取り用）
-            sceneEl.renderer.render(sceneEl.object3D, sceneEl.camera);
+            // 最新の状態を描画
+            scene.renderer.render(scene.object3D, scene.camera);
+
+            // 元のコードで成功していた「表示サイズ」を基準にする
+            const vWidth = video.clientWidth;
+            const vHeight = video.clientHeight;
 
             const canvas = document.createElement('canvas');
-            
-            // ズレを最小限にするため、一旦ビデオの表示サイズに合わせる
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
+            canvas.width = vWidth;
+            canvas.height = vHeight;
             const ctx = canvas.getContext('2d');
 
-            // 1. カメラ映像を全画面描画
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // --- ここからが比率修正のキモ ---
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            const videoAspect = vw / vh;
+            const screenAspect = vWidth / vHeight;
+
+            let sx, sy, sw, sh;
+
+            // object-fit: cover と同じ計算を手動で行う
+            if (videoAspect > screenAspect) {
+                // ビデオが横長すぎる場合：左右をカット
+                sw = vh * screenAspect;
+                sh = vh;
+                sx = (vw - sw) / 2;
+                sy = 0;
+            } else {
+                // ビデオが縦長すぎる場合：上下をカット
+                sw = vw;
+                sh = vw / screenAspect;
+                sx = 0;
+                sy = (vh - sh) / 2;
+            }
+
+            // 1. カメラ映像を描画（計算した sx, sy を使う）
+            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, vWidth, vHeight);
             
-            // 2. AR写真を重ねる
-            // glCanvasをビデオのサイズに合わせて引き伸ばして描画
-            ctx.drawImage(glCanvas, 0, 0, canvas.width, canvas.height);
+            // 2. AR写真を重ねる（これは表示サイズそのままでOK）
+            ctx.drawImage(glCanvas, 0, 0, vWidth, vHeight);
 
             const url = canvas.toDataURL('image/png');
-            console.log("画像生成成功");
             saveImage(url);
 
         } catch (e) {
-            alert("エラーが発生しました: " + e.message);
-            console.error(e);
+            console.error("Capture failed:", e);
         }
     });
 };
