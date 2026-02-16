@@ -8,23 +8,13 @@ window.onload = () => {
     let selectedImgUrl = null;
     let selectedAspect = 1;
 
-    // --- ここが重要：AR開始の確実なトリガー ---
-    const startAR = () => {
-        // A-Frameが準備完了するのを待ってからVR(AR)モードに入る
-        if (scene.hasLoaded) {
-            scene.enterVR();
-        } else {
-            scene.addEventListener('loaded', () => scene.enterVR());
-        }
+    // 1. スタート画面をタップしてAR開始
+    startScreen.addEventListener('click', () => {
+        scene.enterVR(); 
         startScreen.style.display = 'none';
-        // iOS/Android のタップ音対策などで必要な場合があるため
-        window.removeEventListener('click', startAR);
-    };
+    });
 
-    startScreen.addEventListener('click', startAR);
-    // ---------------------------------------
-
-    // 画像選択処理（ここは変更なし）
+    // 2. 画像選択処理
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -50,9 +40,8 @@ window.onload = () => {
         reader.readAsDataURL(file);
     });
 
-    // 写真配置処理
+    // 3. 写真配置（向きと位置を厳密に固定）
     scene.addEventListener('click', (e) => {
-        // ボタン類をクリックした時は配置しない
         if (!selectedImgUrl || e.target.closest('.ui-btn')) return;
 
         const camObj = document.getElementById('myCamera').object3D;
@@ -63,20 +52,22 @@ window.onload = () => {
         camObj.getWorldDirection(dir);
 
         const plane = document.createElement('a-plane');
-        const dist = 1.2;
-        plane.setAttribute('position', {
-            x: pos.x - dir.x * dist,
-            y: pos.y - dir.y * dist,
-            z: pos.z - dir.z * dist
-        });
         
+        // カメラの1.2m前方
+        const dist = 1.2;
+        const targetX = pos.x - dir.x * dist;
+        const targetY = pos.y - dir.y * dist;
+        const targetZ = pos.z - dir.z * dist;
+
+        plane.setAttribute('position', { x: targetX, y: targetY, z: targetZ });
         plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
-        plane.object3D.lookAt(pos);
+
+        // ★写真が床に寝ないように、カメラと同じ高さを見て正対させる
+        const lookTarget = new THREE.Vector3(pos.x, targetY, pos.z);
+        plane.object3D.lookAt(lookTarget);
 
         new THREE.TextureLoader().load(selectedImgUrl, tex => {
-            const mesh = plane.getObject3D('mesh');
-            mesh.material.map = tex;
-            mesh.material.needsUpdate = true;
+            plane.getObject3D('mesh').material.map = tex;
             const size = 0.5;
             if (selectedAspect >= 1) {
                 plane.setAttribute('width', size);
@@ -88,8 +79,13 @@ window.onload = () => {
         });
 
         arWorld.appendChild(plane);
+
         selectedImgUrl = null;
         fileLabel.innerText = "① 写真を選ぶ";
         fileLabel.style.background = "rgba(0,0,0,0.8)";
+    });
+
+    document.getElementById('shotBtn').addEventListener('click', () => {
+        alert("配置成功おめでとうございます！次は保存機能を直しましょう。");
     });
 };

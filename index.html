@@ -6,29 +6,30 @@
     <title>WebXR 写真AR</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; background: transparent; font-family: sans-serif; }
 
-        /* スタート画面：画面全体 */
+        /* スタート画面：AR.jsの時のデザイン */
         #start-screen {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.9); color: white;
+            position: fixed; inset: 0; background: #000; color: white;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 100000; cursor: pointer;
         }
 
-        /* UIコンテナ：AR.jsの時と同じ位置・デザイン */
-        #main-ui {
+        /* UIコンテナ：元の位置・サイズを再現 */
+        .ui-container {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             z-index: 9999; display: flex; gap: 10px; width: 90%; max-width: 400px;
-            pointer-events: none; /* 下の空間を触れるように */
+            pointer-events: none;
         }
 
         .ui-btn {
             flex: 1; padding: 15px 0; background: rgba(0, 0, 0, 0.8); color: white;
             border: 2px solid white; border-radius: 50px; text-align: center;
-            font-size: 14px; font-weight: bold; pointer-events: auto; /* ボタンは反応させる */
+            font-size: 14px; font-weight: bold; pointer-events: auto;
+            text-decoration: none; display: inline-block; cursor: pointer;
         }
 
-        /* A-Frameが勝手に出すボタンを隠す */
+        /* A-Frameの標準ボタンを隠す */
         .a-enter-vr { display: none !important; }
     </style>
 </head>
@@ -39,20 +40,20 @@
         <p>画面をタップして開始</p>
     </div>
 
-    <div id="main-ui">
+    <div class="ui-container" id="main-ui">
         <input type="file" id="fileInput" accept="image/*" style="display:none">
         <label for="fileInput" class="ui-btn" id="fileLabel">① 写真を選ぶ</label>
         <button class="ui-btn" id="shotBtn" type="button">② 写真を撮る</button>
     </div>
 
-<a-scene 
-    webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: body;"
-    vr-mode-ui="enabled: false;" 
-    renderer="preserveDrawingBuffer: true; alpha: true;">
-    
-    <a-entity id="myCamera" camera position="0 1.6 0" look-controls></a-entity>
-    <a-entity id="ar-world"></a-entity>
-</a-scene>
+    <a-scene 
+        webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #main-ui;"
+        vr-mode-ui="enabled: false;" 
+        renderer="preserveDrawingBuffer: true; alpha: true;">
+        
+        <a-entity id="myCamera" camera position="0 1.6 0" look-controls></a-entity>
+        <a-entity id="ar-world"></a-entity>
+    </a-scene>
 
     <script src="js/photoar.js"></script>
 </body>
