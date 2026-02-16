@@ -95,50 +95,52 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, { passive: false });
 
-    // 4. 【重要修正】レイヤー別合成ロジック
+    // 4. 保存ロジック（ここが最重要修正）
     shotBtn.addEventListener('click', async () => {
         try {
             const video = document.querySelector('video');
             const glCanvas = scene.canvas;
             if (!video || !glCanvas) return;
 
-            // A-Frameのレンダリングを最新にする
-            scene.renderer.render(scene.object3D, scene.camera);
+            // 「ブラウザで見えているそのままのサイズ」を保存用キャンバスの大きさにする
+            const outWidth = window.innerWidth;
+            const outHeight = window.innerHeight;
 
-            // 合成用Canvasを作成（スマホ画面の物理的な解像度をベースにする）
             const canvas = document.createElement('canvas');
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = glCanvas.clientWidth * dpr;
-            canvas.height = glCanvas.clientHeight * dpr;
+            canvas.width = outWidth;
+            canvas.height = outHeight;
             const ctx = canvas.getContext('2d');
 
-            // --- レイヤー1: カメラ背景 ---
+            // --- 1. ビデオレイヤーの描画 ---
+            // ビデオ要素の表示スタイルを取得
             const vw = video.videoWidth;
             const vh = video.videoHeight;
             const videoAspect = vw / vh;
-            const canvasAspect = canvas.width / canvas.height;
+            const screenAspect = outWidth / outHeight;
 
             let sx, sy, sWidth, sHeight;
-            // 画面の比率に合わせて、ビデオ側をクロップ（object-fit: cover）
-            if (videoAspect > canvasAspect) {
-                sWidth = vh * canvasAspect;
+            if (videoAspect > screenAspect) {
+                sWidth = vh * screenAspect;
                 sHeight = vh;
                 sx = (vw - sWidth) / 2;
                 sy = 0;
             } else {
                 sWidth = vw;
-                sHeight = vw / canvasAspect;
+                sHeight = vw / screenAspect;
                 sx = 0;
                 sy = (vh - sHeight) / 2;
             }
-            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, outWidth, outHeight);
 
-            // --- レイヤー2: AR (A-Frame) ---
-            // ARレイヤーを単体でビットマップとして取得し、比率を維持したまま背景に重ねる
-            const bitmap = await createImageBitmap(glCanvas);
-            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            // --- 2. ARレイヤーの描画 ---
+            // A-Frameの最新をレンダリング
+            scene.renderer.render(scene.object3D, scene.camera);
+            
+            // 重要：glCanvasの「中身」だけを、今の画面サイズに合わせて「リサイズして」重ねる
+            // これにより、ARが細長くなる歪みが物理的に解消されます
+            ctx.drawImage(glCanvas, 0, 0, outWidth, outHeight);
 
-            // 保存（JPEG, 0.8でファイルサイズも抑制）
+            // 5. 保存（JPEG 画質0.8で軽量化）
             const url = canvas.toDataURL('image/jpeg', 0.8);
             saveImage(url);
 
@@ -165,9 +167,7 @@ window.onload = () => {
             } catch (e) {}
         } else {
             const a = document.createElement('a');
-            a.href = url;
-            a.download = `ar-${Date.now()}.jpg`;
-            a.click();
+            a.href = url; a.download = `ar-${Date.now()}.jpg`; a.click();
         }
     }
 };

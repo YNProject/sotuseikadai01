@@ -6,9 +6,6 @@ body { margin: 0; overflow: hidden; touch-action: none; font-family: sans-serif;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     z-index: 20000; cursor: pointer; transition: opacity 0.5s ease;
 }
-#start-screen h1 { font-size: 32px; margin-bottom: 10px; letter-spacing: 2px; }
-#start-screen p { font-size: 16px; opacity: 0.8; animation: blink 2s infinite; }
-@keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
 
 .ui-container {
     position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
@@ -23,14 +20,18 @@ button, label {
     display: flex; align-items: center; justify-content: center;
 }
 
-/* ビデオとARレイヤーを画面サイズに固定 */
-video, .a-canvas {
+/* キャンバスを画面ピッタリに、かつ歪ませない設定 */
+.a-canvas {
     width: 100vw !important;
     height: 100vh !important;
-    position: absolute;
+    position: fixed !important;
     top: 0;
     left: 0;
-    object-fit: cover !important; /* はみ出しをカットして比率維持 */
+    object-fit: cover;
 }
 
-.a-enter-vr { display: none; }
+video {
+    width: 100vw !important;
+    height: 100vh !important;
+    object-fit: cover !important;
+}
