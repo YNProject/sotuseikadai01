@@ -1,5 +1,16 @@
 window.onload = () => {
     const scene = document.querySelector('a-scene');
+
+// 追加：リサイズイベントが発生した時に、レンダラーのサイズを正しく更新する
+    window.addEventListener('resize', () => {
+        const camera = scene.camera;
+        if (camera) {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        }
+    });
+
+
     const fileInput = document.getElementById('fileInput');
     const fileLabel = document.getElementById('fileLabel');
     const shotBtn = document.getElementById('shotBtn');
