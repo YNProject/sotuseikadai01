@@ -100,52 +100,67 @@ window.onload = () => {
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
 // 4. 保存ロジック（比率修正済み）
-shotBtn.addEventListener('click', () => {
-    try {
-        const video = document.querySelector('video');
-        const glCanvas = scene.canvas;
-        if (!video || !glCanvas) return;
+    shotBtn.addEventListener('click', async () => {
+        try {
+            const video = document.querySelector('video');
+            const glCanvas = scene.canvas;
+            if (!video || !glCanvas) {
+                alert("カメラまたはARの準備ができていません");
+                return;
+            }
 
-        // レンダリングを最新状態に
-        scene.renderer.render(scene.object3D, scene.camera);
+            // A-Frameのレンダラーに現在の状態を描画させる
+            scene.renderer.render(scene.object3D, scene.camera);
 
-        // 出力用Canvasのサイズを「表示されているビデオのサイズ」に合わせる
-        const canvas = document.createElement('canvas');
-        canvas.width = video.clientWidth;
-        canvas.height = video.clientHeight;
-        const ctx = canvas.getContext('2d');
+            // 保存用のキャンバスを作成（表示サイズに合わせる）
+            const canvas = document.createElement('canvas');
+            const displayWidth = video.clientWidth;
+            const displayHeight = video.clientHeight;
+            canvas.width = displayWidth;
+            canvas.height = displayHeight;
+            const ctx = canvas.getContext('2d');
 
-        // 1. ビデオ背景を描画 (表示されている通りに切り抜く)
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
-        const videoAspect = vw / vh;
-        const screenAspect = canvas.width / canvas.height;
+            // --- 1. ビデオ（カメラ背景）の描画 ---
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            const videoAspect = vw / vh;
+            const screenAspect = displayWidth / displayHeight;
 
-        let sx, sy, sw, sh;
-        if (videoAspect > screenAspect) {
-            sw = vh * screenAspect;
-            sh = vh;
-            sx = (vw - sw) / 2;
-            sy = 0;
-        } else {
-            sw = vw;
-            sh = vw / screenAspect;
-            sx = 0;
-            sy = (vh - sh) / 2;
+            let sx, sy, sw, sh;
+            if (videoAspect > screenAspect) {
+                sw = vh * screenAspect;
+                sh = vh;
+                sx = (vw - sw) / 2;
+                sy = 0;
+            } else {
+                sw = vw;
+                sh = vw / screenAspect;
+                sx = 0;
+                sy = (vh - sh) / 2;
+            }
+            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, displayWidth, displayHeight);
+
+            // --- 2. ARレイヤー（物体）の描画 ---
+            // 画面上の見た目のサイズで合成することで「つぶれ」を防止
+            ctx.drawImage(glCanvas, 0, 0, displayWidth, displayHeight);
+
+            // --- 3. 保存実行 ---
+            const url = canvas.toDataURL('image/png');
+            
+            // saveImage関数を呼び出す（もし関数が見つからないエラーが出る場合は、ここに直接処理を書く）
+            if (typeof saveImage === 'function') {
+                saveImage(url);
+            } else {
+                // saveImage関数がスコープ外にある場合のフォールバック
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ar-${Date.now()}.png`;
+                a.click();
+            }
+
+        } catch (err) {
+            console.error("Capture failed:", err);
+            alert("保存に失敗しました: " + err.message);
         }
-        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-
-        // 2. ARレイヤーの描画（ここが重要！）
-        // 画面上の見た目（glCanvas.style.width/height）と 
-        // 内部解像度（glCanvas.width/height）の差を無視して、
-        // 単純に「表示サイズ」に合わせて上書きします。
-        ctx.drawImage(glCanvas, 0, 0, canvas.width, canvas.height);
-
-        const url = canvas.toDataURL('image/png');
-        saveImage(url);
-
-    } catch (e) {
-        console.error("Capture failed:", e);
-    }
-});
+    });
 }; // ここで全て閉じる (成功コードと同じ構造)
