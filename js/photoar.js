@@ -93,54 +93,36 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
-// 4. 保存ロジック（ARレイヤーの比率崩れを防止）
-shotBtn.addEventListener('click', async () => {
-    try {
-        const video = document.querySelector('video');
-        const glCanvas = scene.canvas;
-        if (!video || !glCanvas || !selectedImgUrl) return;
+    // 4. 保存ロジック（画面表示と同じ比率で保存）
+    shotBtn.addEventListener('click', async () => {
+        try {
+            const video = document.querySelector('video');
+            const glCanvas = scene.canvas;
+            if (!video || !glCanvas || !selectedImgUrl) return;
 
-        scene.renderer.render(scene.object3D, scene.camera);
+            scene.renderer.render(scene.object3D, scene.camera);
 
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
+            const canvas = document.createElement('canvas');
+            const width = glCanvas.clientWidth;
+            const height = glCanvas.clientHeight;
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
 
-        const canvas = document.createElement('canvas');
-        canvas.width = vw;
-        canvas.height = vh;
-        const ctx = canvas.getContext('2d');
+            // ビデオ背景を描画（画面に見えているサイズで）
+            ctx.drawImage(video, 0, 0, width, height);
 
-        // --- ビデオ背景を描画（object-fit: cover 相当） ---
-        const videoAspect = vw / vh;
-        const screenAspect = vw / vh;
-        let sx, sy, sWidth, sHeight;
+            // ARレイヤーを描画（画面と同じサイズで）
+            const bitmap = await createImageBitmap(glCanvas);
+            ctx.drawImage(bitmap, 0, 0, width, height);
 
-        if (videoAspect > screenAspect) {
-            sWidth = vh * screenAspect;
-            sHeight = vh;
-            sx = (vw - sWidth) / 2;
-            sy = 0;
-        } else {
-            sWidth = vw;
-            sHeight = vw / screenAspect;
-            sx = 0;
-            sy = (vh - sHeight) / 2;
+            const url = canvas.toDataURL('image/png');
+            saveImage(url);
+
+        } catch (e) {
+            console.error("Capture failed:", e);
         }
-
-        ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
-
-        // --- ARレイヤーを元画像の比率で描画 ---
-        const bitmap = await createImageBitmap(glCanvas);
-        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-
-        const url = canvas.toDataURL('image/png');
-        saveImage(url);
-
-    } catch (e) {
-        console.error("Capture failed:", e);
-    }
-});
-
+    });
 
     // 5. 保存・共有用関数
     async function saveImage(url) {
@@ -169,15 +151,4 @@ shotBtn.addEventListener('click', async () => {
             a.click();
         }
     }
-
-    scene.addEventListener('loaded', () => {
-    const renderer = scene.renderer;
-    const canvas = scene.canvas;
-    if (renderer && canvas) {
-        const width = canvas.clientWidth;
-        const height = canvas.clientHeight;
-        renderer.setSize(width, height, false);
-    }
-});
-
 };
