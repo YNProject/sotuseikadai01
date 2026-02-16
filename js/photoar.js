@@ -88,20 +88,20 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
-    // 4. 【決定版】横伸び・横潰れを修正した保存ロジック
-// 4. 【修正版】解像度と比率を完全に維持する保存ロジック
-// 4. 【修正版】動作実績のあるコードをベースに比率だけ正す
+    // 4. 保存ロジック（比率修正版）
     shotBtn.addEventListener('click', () => {
         try {
             const video = document.querySelector('video');
             const glCanvas = scene.canvas;
 
-            if (!video || !glCanvas) return;
+            if (!video || !glCanvas) {
+                alert("カメラまたはARの準備ができていません");
+                return;
+            }
 
             // 最新の状態を描画
             scene.renderer.render(scene.object3D, scene.camera);
 
-            // 元のコードで成功していた「表示サイズ」を基準にする
             const vWidth = video.clientWidth;
             const vHeight = video.clientHeight;
 
@@ -110,7 +110,6 @@ window.onload = () => {
             canvas.height = vHeight;
             const ctx = canvas.getContext('2d');
 
-            // --- ここからが比率修正のキモ ---
             const vw = video.videoWidth;
             const vh = video.videoHeight;
             const videoAspect = vw / vh;
@@ -118,32 +117,51 @@ window.onload = () => {
 
             let sx, sy, sw, sh;
 
-            // object-fit: cover と同じ計算を手動で行う
             if (videoAspect > screenAspect) {
-                // ビデオが横長すぎる場合：左右をカット
                 sw = vh * screenAspect;
                 sh = vh;
                 sx = (vw - sw) / 2;
                 sy = 0;
             } else {
-                // ビデオが縦長すぎる場合：上下をカット
                 sw = vw;
                 sh = vw / screenAspect;
                 sx = 0;
                 sy = (vh - sh) / 2;
             }
 
-            // 1. カメラ映像を描画（計算した sx, sy を使う）
             ctx.drawImage(video, sx, sy, sw, sh, 0, 0, vWidth, vHeight);
-            
-            // 2. AR写真を重ねる（これは表示サイズそのままでOK）
             ctx.drawImage(glCanvas, 0, 0, vWidth, vHeight);
 
             const url = canvas.toDataURL('image/png');
-            saveImage(url);
+            saveImage(url); // 下で定義した関数を呼び出す
 
         } catch (e) {
             console.error("Capture failed:", e);
+            alert("撮影に失敗しました: " + e.message);
         }
     });
+
+    // 5. 保存実行関数（shotBtnから呼び出される）
+    async function saveImage(url) {
+        // シャッター音代わりのフラッシュ演出
+        const f = document.createElement('div');
+        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
+        document.body.appendChild(f);
+        setTimeout(() => { f.style.transition='opacity .4s'; f.style.opacity=0; setTimeout(()=>f.remove(),400); }, 50);
+
+        if (navigator.share) {
+            try {
+                const blob = await (await fetch(url)).blob();
+                const file = new File([blob], `ar-${Date.now()}.png`, { type: 'image/png' });
+                await navigator.share({ files: [file] });
+            } catch (e) {
+                console.log("Share cancelled");
+            }
+        } else {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ar-${Date.now()}.png`;
+            a.click();
+        }
+    }
 };
