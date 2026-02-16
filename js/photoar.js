@@ -138,7 +138,7 @@ shotBtn.addEventListener('click', async ()=>{
 try{
 
 const video = document.querySelector('video');
-const glCanvas = scene.renderer.domElement;
+const glCanvas = scene.components.screenshot.getCanvas('perspective');
 
 const vw = video.videoWidth;
 const vh = video.videoHeight;
@@ -152,31 +152,30 @@ canvas.height = vh;
 
 const ctx = canvas.getContext('2d');
 
-// まずカメラ
+// camera
 ctx.drawImage(video,0,0,vw,vh);
 
-// ---- AR 合成（比率維持） ----
+// AR合成
 const vAspect = vw / vh;
 const gAspect = gw / gh;
 
 let drawW, drawH, ox, oy;
 
 if(gAspect > vAspect){
-    drawH = vh;
-    drawW = vh * gAspect;
-    ox = (vw - drawW)/2;
-    oy = 0;
+drawH = vh;
+drawW = vh * gAspect;
+ox = (vw - drawW)/2;
+oy = 0;
 }else{
-    drawW = vw;
-    drawH = vw / gAspect;
-    ox = 0;
-    oy = (vh - drawH)/2;
+drawW = vw;
+drawH = vw / gAspect;
+ox = 0;
+oy = (vh - drawH)/2;
 }
 
 ctx.drawImage(glCanvas,ox,oy,drawW,drawH);
 
-// ---------------------------
-
+// export
 const url = canvas.toDataURL('image/png');
 
 // flash
