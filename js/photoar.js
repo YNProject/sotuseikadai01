@@ -137,47 +137,44 @@ shotBtn.addEventListener('click', async () => {
     try {
         const video = document.querySelector('video');
         const sceneEl = document.querySelector('a-scene');
-        
-        // A-Frameの描画用Canvasを直接取得
         const glCanvas = sceneEl.canvas; 
 
         const vw = video.videoWidth;
         const vh = video.videoHeight;
         
-        // 保存用Canvas（カメラの解像度）
+        // 保存用Canvas（カメラの生解像度）
         const canvas = document.createElement('canvas');
         canvas.width = vw;
         canvas.height = vh;
         const ctx = canvas.getContext('2d');
 
-        // 1. カメラ映像を描画
+        // 1. カメラ映像をまずフルサイズで描画
         ctx.drawImage(video, 0, 0, vw, vh);
 
-        // 2. ARレイヤー（glCanvas）を計算して重ねる
-        // 画面の比率を取得
-        const screenW = window.innerWidth;
-        const screenH = window.innerHeight;
-        const screenAspect = screenW / screenH;
-        const videoAspect = vw / vh;
+        // 2. ARレイヤーの重なりを計算
+        // ビデオがブラウザ画面内で実際に表示されている位置とサイズ（CSSピクセル）を取得
+        const vRect = video.getBoundingClientRect();
+        
+        // 画面のサイズ
+        const sw = window.innerWidth;
+        const sh = window.innerHeight;
 
-        let drawW, drawH, dx, dy;
+        // ビデオの表示倍率を計算（生データ vs 画面上の表示サイズ）
+        const scaleX = vw / vRect.width;
+        const scaleY = vh / vRect.height;
 
-        if (videoAspect > screenAspect) {
-            // ビデオの方が横長（左右に余白ができるパターン）
-            drawH = vh;
-            drawW = vh * screenAspect;
-            dx = (vw - drawW) / 2;
-            dy = 0;
-        } else {
-            // ビデオの方が縦長（上下に余白ができるパターン）
-            drawW = vw;
-            drawH = vw / screenAspect;
-            dx = 0;
-            dy = (vh - drawH) / 2;
-        }
+        // ARのCanvas（画面全体）のうち、ビデオが表示されている領域に対応する部分だけを抽出
+        // tx, ty はビデオが画面からはみ出している（クロップされている）量
+        const tx = (vRect.left < 0) ? Math.abs(vRect.left) : 0;
+        const ty = (vRect.top < 0) ? Math.abs(vRect.top) : 0;
 
-        // ARのCanvasを、計算した「見えている範囲」に合わせて描画
-        ctx.drawImage(glCanvas, dx, dy, drawW, drawH);
+        // 合成：
+        // 画面で見えているAR(glCanvas)を、ビデオのスケールに合わせて変形して重ねる
+        ctx.drawImage(
+            glCanvas, 
+            tx, ty, sw - Math.abs(vRect.left)*2, sh - Math.abs(vRect.top)*2, // ソース（画面の見える範囲）
+            0, 0, vw, vh // デスティネーション（ビデオ全域）
+        );
 
         // --- 以下、保存・共有処理 ---
         const url = canvas.toDataURL('image/png');
