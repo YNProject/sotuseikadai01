@@ -78,9 +78,22 @@ window.onload = () => {
             mesh.material.map = texture;
             mesh.material.opacity = 1.0;
             mesh.material.needsUpdate = true;
-            const aspect = texture.image.width / texture.image.height;
-            newImage.setAttribute('width', 0.2 * aspect); 
-            newImage.setAttribute('height', 0.2);
+const imgW = texture.image.width;
+const imgH = texture.image.height;
+const aspect = imgW / imgH;
+
+const maxSize = 0.25; // 表示したい最大辺サイズ（お好み）
+
+if (aspect >= 1) {
+    // 横長 → 幅固定
+    newImage.setAttribute('width', maxSize);
+    newImage.setAttribute('height', maxSize / aspect);
+} else {
+    // 縦長 → 高さ固定
+    newImage.setAttribute('height', maxSize);
+    newImage.setAttribute('width', maxSize * aspect);
+}
+
         });
 
         scene.appendChild(newImage);
