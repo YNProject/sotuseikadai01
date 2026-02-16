@@ -140,17 +140,42 @@ try{
 const video = document.querySelector('video');
 const glCanvas = scene.renderer.domElement;
 
-const w = video.videoWidth;
-const h = video.videoHeight;
+const vw = video.videoWidth;
+const vh = video.videoHeight;
+
+const gw = glCanvas.width;
+const gh = glCanvas.height;
 
 const canvas = document.createElement('canvas');
-canvas.width = w;
-canvas.height = h;
+canvas.width = vw;
+canvas.height = vh;
 
 const ctx = canvas.getContext('2d');
 
-ctx.drawImage(video,0,0,w,h);
-ctx.drawImage(glCanvas,0,0,w,h);
+// まずカメラ
+ctx.drawImage(video,0,0,vw,vh);
+
+// ---- AR 合成（比率維持） ----
+const vAspect = vw / vh;
+const gAspect = gw / gh;
+
+let drawW, drawH, ox, oy;
+
+if(gAspect > vAspect){
+    drawH = vh;
+    drawW = vh * gAspect;
+    ox = (vw - drawW)/2;
+    oy = 0;
+}else{
+    drawW = vw;
+    drawH = vw / gAspect;
+    ox = 0;
+    oy = (vh - drawH)/2;
+}
+
+ctx.drawImage(glCanvas,ox,oy,drawW,drawH);
+
+// ---------------------------
 
 const url = canvas.toDataURL('image/png');
 
@@ -161,22 +186,19 @@ document.body.appendChild(f);
 setTimeout(()=>{f.style.opacity=0;setTimeout(()=>f.remove(),400)},50);
 
 if(navigator.share){
-
 const blob = await(await fetch(url)).blob();
 const file = new File([blob],`ar-${Date.now()}.png`,{type:'image/png'});
 await navigator.share({files:[file]}).catch(()=>{});
-
 }else{
-
 const a=document.createElement('a');
 a.href=url;
 a.download=`ar-${Date.now()}.png`;
 a.click();
-
 }
 
 }catch(e){console.error(e);}
 
 });
+
 
 };
