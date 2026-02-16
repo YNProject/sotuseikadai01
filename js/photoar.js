@@ -7,7 +7,7 @@ window.onload = () => {
     const mainUI = document.getElementById('main-ui');
 
     let selectedImgUrl = null;
-    let selectedAspect = 1; 
+    let selectedAspect = 1;
     let canPlace = false;
     let appStarted = false;
 
@@ -47,55 +47,57 @@ window.onload = () => {
     });
 
     function addPhoto(e) {
-    if (!appStarted || e.target.closest('.ui-container')) return;
-    if (!selectedImgUrl || !canPlace) return;
+        if (!appStarted || e.target.closest('.ui-container')) return;
+        if (!selectedImgUrl || !canPlace) return;
 
-    // 1. カメラの「現在の位置」と「向いている方向」を取得
-    const camObj = document.getElementById('myCamera').object3D;
-    const worldPos = new THREE.Vector3();
-    const worldDir = new THREE.Vector3();
-    
-    camObj.getWorldPosition(worldPos);
-    camObj.getWorldDirection(worldDir);
+        // 1. シーン（世界）を取得
+        const sceneEl = document.querySelector('a-scene');
+        const camEl = document.getElementById('myCamera');
 
-    // 2. 配置する座標を計算（カメラの1.2m前方）
-    const dist = 1.2;
-    const targetX = worldPos.x - worldDir.x * dist;
-    const targetY = worldPos.y - worldDir.y * dist;
-    const targetZ = worldPos.z - worldDir.z * dist;
+        // 2. カメラの「現在の世界座標」と「向いている方向」を取得
+        const worldPos = new THREE.Vector3();
+        const worldDir = new THREE.Vector3();
+        camEl.object3D.getWorldPosition(worldPos);
+        camEl.object3D.getWorldDirection(worldDir);
 
-    // 3. 写真（a-plane）を作成
-    const plane = document.createElement('a-plane');
-    plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
-    
-    // 重要：位置を「シーンの固定座標」として設定
-    plane.setAttribute('position', { x: targetX, y: targetY, z: targetZ });
+        // 3. 配置する絶対座標を計算（カメラの1.5m前方）
+        const dist = 1.5;
+        const targetX = worldPos.x - worldDir.x * dist;
+        const targetY = worldPos.y - worldDir.y * dist;
+        const targetZ = worldPos.z - worldDir.z * dist;
 
-    // 4. 配置後にカメラの方を向かせる（一度きりの実行）
-    plane.object3D.lookAt(worldPos);
+        // 4. 写真（a-plane）を作成
+        const plane = document.createElement('a-plane');
 
-    // 5. シーン（a-scene）の直下に追加（カメラの中に入れない）
-    scene.appendChild(plane);
+        // 5. 重要：位置を「世界の絶対座標」に固定
+        plane.setAttribute('position', `${targetX} ${targetY} ${targetZ}`);
 
-    // テクスチャの読み込みとサイズ設定
-    new THREE.TextureLoader().load(selectedImgUrl, tex => {
-        const mesh = plane.getObject3D('mesh');
-        mesh.material.map = tex;
-        mesh.material.needsUpdate = true;
-        const size = 0.5;
-        if (selectedAspect >= 1) {
-            plane.setAttribute('width', size);
-            plane.setAttribute('height', size / selectedAspect);
-        } else {
-            plane.setAttribute('height', size);
-            plane.setAttribute('width', size * selectedAspect);
-        }
-    });
+        // 6. 配置した瞬間にだけ、カメラの方を向かせる
+        plane.object3D.lookAt(worldPos);
 
-    canPlace = false;
-    fileLabel.innerText = "① 写真を選ぶ";
-    fileLabel.style.background = "rgba(0,0,0,.8)";
-}
+        plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
+
+        // 7. カメラの中（appendChild(camEl)）ではなく、シーンに追加する
+        sceneEl.appendChild(plane);
+
+        new THREE.TextureLoader().load(selectedImgUrl, tex => {
+            const mesh = plane.getObject3D('mesh');
+            mesh.material.map = tex;
+            mesh.material.needsUpdate = true;
+            const size = 0.8; // 少し大きめに設定
+            if (selectedAspect >= 1) {
+                plane.setAttribute('width', size);
+                plane.setAttribute('height', size / selectedAspect);
+            } else {
+                plane.setAttribute('height', size);
+                plane.setAttribute('width', size * selectedAspect);
+            }
+        });
+
+        canPlace = false;
+        fileLabel.innerText = "① 写真を選ぶ";
+        fileLabel.style.background = "rgba(0,0,0,.8)";
+    }
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, { passive: false });
 
@@ -137,7 +139,7 @@ window.onload = () => {
             const cw = glCanvas.width;
             const ch = glCanvas.height;
             const cAspect = cw / ch;
-            
+
             let sourceX, sourceY, sourceW, sourceH;
             if (cAspect > sAspect) {
                 sourceW = ch * sAspect;
@@ -171,7 +173,7 @@ window.onload = () => {
         const blob = await (await fetch(url)).blob();
         const file = new File([blob], `ar-${Date.now()}.jpg`, { type: 'image/jpeg' });
         if (navigator.share) {
-            try { await navigator.share({ files: [file] }); } catch (e) {}
+            try { await navigator.share({ files: [file] }); } catch (e) { }
         } else {
             const a = document.createElement('a');
             a.href = url; a.download = file.name; a.click();
