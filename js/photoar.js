@@ -1,22 +1,14 @@
 window.onload = () => {
     const scene = document.querySelector('a-scene');
     const arWorld = document.getElementById('ar-world');
-    const mainUI = document.getElementById('main-ui');
-    const startScreen = document.getElementById('start-screen');
+    const fileInput = document.getElementById('fileInput');
+    const fileLabel = document.getElementById('fileLabel');
 
     let selectedImgUrl = null;
     let selectedAspect = 1;
 
-    // 1. AR開始ボタン
-    startScreen.addEventListener('click', () => {
-        // A-FrameにARモード開始を要求（これでカメラが起動します）
-        scene.enterVR();
-        startScreen.style.display = 'none';
-        mainUI.style.visibility = 'visible';
-    });
-
-    // 2. 画像選択処理
-    document.getElementById('fileInput').addEventListener('change', e => {
+    // 画像選択
+    fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
@@ -33,39 +25,42 @@ window.onload = () => {
                 ctx.drawImage(img, 0, 0, w, h);
                 selectedImgUrl = c.toDataURL('image/jpeg', 0.8);
                 selectedAspect = w / h;
-                document.getElementById('fileLabel').innerText = "✅ 画面タップ";
+                fileLabel.innerText = "✅ 画面をタップ！";
+                fileLabel.style.background = "#2e7d32";
             };
             img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
     });
 
-    // 3. 写真配置（重要：世界の座標系に固定）
+    // 写真配置
+    // WebXRでは「select」イベントが画面タップに相当します
     scene.addEventListener('click', (e) => {
-        if (!selectedImgUrl || e.target.closest('.ui-container')) return;
+        // UIボタンをクリックした時は配置しない
+        if (!selectedImgUrl || e.target.closest('#main-ui')) return;
 
         const camObj = document.getElementById('myCamera').object3D;
         const pos = new THREE.Vector3();
         const dir = new THREE.Vector3();
         
-        // カメラの現在位置と向きを取得
         camObj.getWorldPosition(pos);
         camObj.getWorldDirection(dir);
 
         const plane = document.createElement('a-plane');
-        // 1.2m先に配置
+        // 1.5m先に固定（これで歩いて離れられるようになります）
+        const dist = 1.5;
         plane.setAttribute('position', {
-            x: pos.x - dir.x * 1.2,
-            y: pos.y - dir.y * 1.2,
-            z: pos.z - dir.z * 1.2
+            x: pos.x - dir.x * dist,
+            y: pos.y - dir.y * dist,
+            z: pos.z - dir.z * dist
         });
         
         plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
-        plane.object3D.lookAt(pos); // 自分の方を向かせる
+        plane.object3D.lookAt(pos);
 
         new THREE.TextureLoader().load(selectedImgUrl, tex => {
             plane.getObject3D('mesh').material.map = tex;
-            const size = 0.5;
+            const size = 0.8;
             if (selectedAspect >= 1) {
                 plane.setAttribute('width', size);
                 plane.setAttribute('height', size / selectedAspect);
@@ -76,6 +71,15 @@ window.onload = () => {
         });
 
         arWorld.appendChild(plane);
-        document.getElementById('fileLabel').innerText = "① 写真選ぶ";
+        
+        // リセット
+        selectedImgUrl = null;
+        fileLabel.innerText = "① 写真を選ぶ";
+        fileLabel.style.background = "rgba(0,0,0,0.7)";
+    });
+
+    // 保存ボタン（WebXRモードでのキャプチャはブラウザ制限が厳しいため、まずは配置の成功を確認しましょう）
+    document.getElementById('shotBtn').addEventListener('click', () => {
+        alert("配置が安定したら、このボタンで保存できるように調整します！");
     });
 };

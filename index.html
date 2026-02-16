@@ -6,41 +6,57 @@
     <title>WebXR 写真AR</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <style>
-        /* CSSをここに直接書くと読み込み順による崩れを防げます */
         body { margin: 0; overflow: hidden; background: #000; }
-        .ui-container {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            z-index: 99999; display: flex; gap: 10px; width: 90%; max-width: 400px;
-            visibility: hidden; /* 最初は隠す */
+        
+        /* ARモード中も表示されるUIのスタイル */
+        #main-ui {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999; /* 最前面に */
+            display: flex;
+            gap: 10px;
+            width: 90%;
+            max-width: 400px;
+            pointer-events: auto; /* タッチを有効に */
         }
-        button, label {
-            padding: 15px 5px; background: rgba(0,0,0,0.8); color: white;
-            border-radius: 50px; border: 2px solid white; flex: 1; 
-            text-align: center; font-size: 12px; cursor: pointer;
+
+        .ui-btn {
+            padding: 15px 5px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: 2px solid white;
+            border-radius: 50px;
+            flex: 1;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
         }
-        #start-screen {
-            position: fixed; inset: 0; background: #000; color: white;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 100000;
+
+        /* ARボタン（右下のやつ）を大きくして押しやすくする */
+        .a-enter-vr-button {
+            bottom: 100px !important; /* ボタンと被らないように調整 */
         }
     </style>
 </head>
 <body>
 
-    <div id="start-screen">
-        <h1>WebXR 写真AR</h1>
-        <p>タップしてAR開始</p>
-    </div>
-
-    <div class="ui-container" id="main-ui">
+    <div id="main-ui">
         <input type="file" id="fileInput" accept="image/*" style="display:none">
-        <label for="fileInput" id="fileLabel">① 写真選ぶ</label>
-        <button id="shotBtn">② 写真撮る</button>
+        <label for="fileInput" class="ui-btn" id="fileLabel">① 写真を選ぶ</label>
+        <button class="ui-btn" id="shotBtn">② 写真を撮る</button>
     </div>
 
-    <a-scene webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #main-ui;">
+    <a-scene 
+        webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #main-ui;"
+        vr-mode-ui="enabled: true;"
+        renderer="preserveDrawingBuffer: true; alpha: true;">
+        
         <a-entity id="myCamera" camera position="0 1.6 0"></a-entity>
         <a-entity id="ar-world"></a-entity>
+        
     </a-scene>
 
     <script src="js/photoar.js"></script>
