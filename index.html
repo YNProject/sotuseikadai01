@@ -45,14 +45,14 @@
         <button class="ui-btn" id="shotBtn" type="button">② 写真を撮る</button>
     </div>
 
-    <a-scene 
-        webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #main-ui;"
-        vr-mode-ui="enabled: false;" 
-        renderer="preserveDrawingBuffer: true; alpha: true;">
-        
-        <a-entity id="myCamera" camera position="0 1.6 0" look-controls></a-entity>
-        <a-entity id="ar-world"></a-entity>
-    </a-scene>
+<a-scene 
+    webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: body;"
+    vr-mode-ui="enabled: false;" 
+    renderer="preserveDrawingBuffer: true; alpha: true;">
+    
+    <a-entity id="myCamera" camera position="0 1.6 0" look-controls></a-entity>
+    <a-entity id="ar-world"></a-entity>
+</a-scene>
 
     <script src="js/photoar.js"></script>
 </body>

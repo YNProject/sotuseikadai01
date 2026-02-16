@@ -8,13 +8,23 @@ window.onload = () => {
     let selectedImgUrl = null;
     let selectedAspect = 1;
 
-    // 1. スタート画面をタップしてAR開始（ARボタンの代わり）
-    startScreen.addEventListener('click', () => {
-        scene.enterVR(); // これでカメラとWebXRが起動
+    // --- ここが重要：AR開始の確実なトリガー ---
+    const startAR = () => {
+        // A-Frameが準備完了するのを待ってからVR(AR)モードに入る
+        if (scene.hasLoaded) {
+            scene.enterVR();
+        } else {
+            scene.addEventListener('loaded', () => scene.enterVR());
+        }
         startScreen.style.display = 'none';
-    });
+        // iOS/Android のタップ音対策などで必要な場合があるため
+        window.removeEventListener('click', startAR);
+    };
 
-    // 2. 画像選択処理
+    startScreen.addEventListener('click', startAR);
+    // ---------------------------------------
+
+    // 画像選択処理（ここは変更なし）
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -40,22 +50,19 @@ window.onload = () => {
         reader.readAsDataURL(file);
     });
 
-    // 3. 写真配置（移動検知対応）
+    // 写真配置処理
     scene.addEventListener('click', (e) => {
-        // UIボタンのクリック時は配置しない
+        // ボタン類をクリックした時は配置しない
         if (!selectedImgUrl || e.target.closest('.ui-btn')) return;
 
         const camObj = document.getElementById('myCamera').object3D;
         const pos = new THREE.Vector3();
         const dir = new THREE.Vector3();
         
-        // カメラの現在の位置と向きを世界座標で取得
         camObj.getWorldPosition(pos);
         camObj.getWorldDirection(dir);
 
         const plane = document.createElement('a-plane');
-        
-        // カメラの1.2m前方。WebXRなのでこの座標に「固定」されます
         const dist = 1.2;
         plane.setAttribute('position', {
             x: pos.x - dir.x * dist,
@@ -64,13 +71,12 @@ window.onload = () => {
         });
         
         plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
-        plane.object3D.lookAt(pos); // 常に自分の方向を向かせる
+        plane.object3D.lookAt(pos);
 
         new THREE.TextureLoader().load(selectedImgUrl, tex => {
             const mesh = plane.getObject3D('mesh');
             mesh.material.map = tex;
             mesh.material.needsUpdate = true;
-            
             const size = 0.5;
             if (selectedAspect >= 1) {
                 plane.setAttribute('width', size);
@@ -82,15 +88,8 @@ window.onload = () => {
         });
 
         arWorld.appendChild(plane);
-
-        // 状態を戻す
         selectedImgUrl = null;
         fileLabel.innerText = "① 写真を選ぶ";
         fileLabel.style.background = "rgba(0,0,0,0.8)";
-    });
-
-    // 4. 保存（撮影）ボタン
-    document.getElementById('shotBtn').addEventListener('click', () => {
-        alert("配置が成功したら、保存機能もWebXR用に復活させましょう！");
     });
 };
