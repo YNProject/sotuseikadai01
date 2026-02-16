@@ -100,39 +100,39 @@ shotBtn.addEventListener('click', () => {
         const glCanvas = scene.canvas;
         if (!video || !glCanvas) return;
 
-        // 最新のAR状態をレンダリング
         scene.renderer.render(scene.object3D, scene.camera);
 
         const vw = video.videoWidth;
         const vh = video.videoHeight;
+        const vClientW = video.clientWidth;
+        const vClientH = video.clientHeight;
 
-        // glCanvasのサイズに合わせて保存用canvasを作成
         const canvas = document.createElement('canvas');
-        canvas.width = glCanvas.width;
-        canvas.height = glCanvas.height;
+        canvas.width = vClientW;
+        canvas.height = vClientH;
         const ctx = canvas.getContext('2d');
 
         // --- ビデオ背景を描画（object-fit: cover 相当） ---
         const videoAspect = vw / vh;
-        const canvasAspect = canvas.width / canvas.height;
+        const screenAspect = vClientW / vClientH;
         let sx, sy, sWidth, sHeight;
 
-        if (videoAspect > canvasAspect) {
-            sWidth = vh * canvasAspect;
+        if (videoAspect > screenAspect) {
+            sWidth = vh * screenAspect;
             sHeight = vh;
             sx = (vw - sWidth) / 2;
             sy = 0;
         } else {
             sWidth = vw;
-            sHeight = vw / canvasAspect;
+            sHeight = vw / screenAspect;
             sx = 0;
             sy = (vh - sHeight) / 2;
         }
 
         ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
-        // --- ARレイヤーをそのまま重ねる ---
-        ctx.drawImage(glCanvas, 0, 0, canvas.width, canvas.height);
+        // --- ARレイヤーを描画（clientサイズで） ---
+        ctx.drawImage(glCanvas, 0, 0, glCanvas.clientWidth, glCanvas.clientHeight, 0, 0, canvas.width, canvas.height);
 
         const url = canvas.toDataURL('image/png');
         saveImage(url);
@@ -141,8 +141,6 @@ shotBtn.addEventListener('click', () => {
         console.error("Capture failed:", e);
     }
 });
-
-
 
     // 5. 保存・共有用関数
     async function saveImage(url) {
