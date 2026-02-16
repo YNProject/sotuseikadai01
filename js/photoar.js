@@ -10,7 +10,7 @@ window.onload = () => {
     let canPlace = false;
     let appStarted = false;
 
-    // 1. スタート画面制御
+    // 1. スタート画面
     startScreen.addEventListener('click', () => {
         startScreen.style.opacity = '0';
         setTimeout(() => {
@@ -20,7 +20,7 @@ window.onload = () => {
         }, 400);
     });
 
-    // 2. 画像選択・リサイズ
+    // 2. 画像選択
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -88,18 +88,18 @@ window.onload = () => {
     window.addEventListener('mousedown', addPhoto);
     window.addEventListener('touchstart', addPhoto, {passive: false});
 
-    // 4. 保存ロジック（比率修正版）
-    shotBtn.addEventListener('click', () => {
+    // 4. 保存機能（ここを確実に動くように修正しました）
+    shotBtn.addEventListener('click', async () => {
         try {
             const video = document.querySelector('video');
             const glCanvas = scene.canvas;
 
             if (!video || !glCanvas) {
-                alert("カメラまたはARの準備ができていません");
+                alert("準備中です。カメラが映るまでお待ちください。");
                 return;
             }
 
-            // 最新の状態を描画
+            // A-Frameの描画を最新にする
             scene.renderer.render(scene.object3D, scene.camera);
 
             const vWidth = video.clientWidth;
@@ -110,45 +110,48 @@ window.onload = () => {
             canvas.height = vHeight;
             const ctx = canvas.getContext('2d');
 
+            // ビデオの元サイズ
             const vw = video.videoWidth;
             const vh = video.videoHeight;
             const videoAspect = vw / vh;
             const screenAspect = vWidth / vHeight;
 
             let sx, sy, sw, sh;
-
             if (videoAspect > screenAspect) {
-                sw = vh * screenAspect;
-                sh = vh;
-                sx = (vw - sw) / 2;
-                sy = 0;
+                sw = vh * screenAspect; sh = vh;
+                sx = (vw - sw) / 2; sy = 0;
             } else {
-                sw = vw;
-                sh = vw / screenAspect;
-                sx = 0;
-                sy = (vh - sh) / 2;
+                sw = vw; sh = vw / screenAspect;
+                sx = 0; sy = (vh - sh) / 2;
             }
 
+            // 背景とARを合成
             ctx.drawImage(video, sx, sy, sw, sh, 0, 0, vWidth, vHeight);
             ctx.drawImage(glCanvas, 0, 0, vWidth, vHeight);
 
             const url = canvas.toDataURL('image/png');
-            saveImage(url); // 下で定義した関数を呼び出す
+
+            // 保存処理の呼び出し
+            await triggerSave(url);
 
         } catch (e) {
-            console.error("Capture failed:", e);
-            alert("撮影に失敗しました: " + e.message);
+            alert("エラー: " + e.message);
         }
     });
 
-    // 5. 保存実行関数（shotBtnから呼び出される）
-    async function saveImage(url) {
-        // シャッター音代わりのフラッシュ演出
+    // 5. 保存実行関数（shotBtnの中から呼び出されます）
+    async function triggerSave(url) {
+        // フラッシュ演出
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
         document.body.appendChild(f);
-        setTimeout(() => { f.style.transition='opacity .4s'; f.style.opacity=0; setTimeout(()=>f.remove(),400); }, 50);
+        setTimeout(() => { 
+            f.style.transition='opacity .4s'; 
+            f.style.opacity=0; 
+            setTimeout(()=>f.remove(), 400); 
+        }, 50);
 
+        // 保存・共有
         if (navigator.share) {
             try {
                 const blob = await (await fetch(url)).blob();
