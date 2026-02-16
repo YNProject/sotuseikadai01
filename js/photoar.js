@@ -1,14 +1,25 @@
 window.onload = () => {
     const scene = document.querySelector('a-scene');
-    const arWorld = document.getElementById('ar-world');
     const fileInput = document.getElementById('fileInput');
     const fileLabel = document.getElementById('fileLabel');
     const shotBtn = document.getElementById('shotBtn');
+    const startScreen = document.getElementById('start-screen');
+    const mainUI = document.getElementById('main-ui');
 
     let selectedImgUrl = null;
     let selectedAspect = 1;
+    let canPlace = false;
+    let appStarted = false;
 
-    // 画像選択
+    startScreen.addEventListener('click', () => {
+        startScreen.style.opacity = '0';
+        setTimeout(() => {
+            startScreen.style.display = 'none';
+            mainUI.style.display = 'flex';
+            appStarted = true;
+        }, 400);
+    });
+
     fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -16,8 +27,17 @@ window.onload = () => {
         reader.onload = ev => {
             const img = new Image();
             img.onload = () => {
-                selectedImgUrl = ev.target.result;
-                selectedAspect = img.width / img.height;
+                const c = document.createElement('canvas');
+                const max = 1024;
+                let w = img.width, h = img.height;
+                if (w > h && w > max) { h *= max / w; w = max; }
+                else if (h > max) { w *= max / h; h = max; }
+                c.width = w; c.height = h;
+                const ctx = c.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                selectedImgUrl = c.toDataURL('image/jpeg', 0.9);
+                selectedAspect = w / h;
+                canPlace = true;
                 fileLabel.innerText = "✅ 画面をタップ！";
                 fileLabel.style.background = "#2e7d32";
             };
@@ -26,64 +46,137 @@ window.onload = () => {
         reader.readAsDataURL(file);
     });
 
-    // 空間配置
-    scene.addEventListener('click', (e) => {
-        if (!selectedImgUrl || e.target.closest('#main-ui')) return;
+    function addPhoto(e) {
+        if (!appStarted || e.target.closest('.ui-container')) return;
+        if (!selectedImgUrl || !canPlace) return;
 
-        const camera = document.getElementById('myCamera').object3D;
-        const pos = new THREE.Vector3();
-        const dir = new THREE.Vector3();
-        
-        camera.getWorldPosition(pos);
-        camera.getWorldDirection(dir);
+        // 1. シーン（世界）を取得
+        const sceneEl = document.querySelector('a-scene');
+        const camEl = document.getElementById('myCamera');
 
-        const plane = document.createElement('a-plane');
+        // 2. カメラの「現在の世界座標」と「向いている方向」を取得
+        const worldPos = new THREE.Vector3();
+        const worldDir = new THREE.Vector3();
+        camEl.object3D.getWorldPosition(worldPos);
+        camEl.object3D.getWorldDirection(worldDir);
+
+        // 3. 配置する絶対座標を計算（カメラの1.5m前方）
         const dist = 1.5;
-        
-        plane.setAttribute('position', {
-            x: pos.x - dir.x * dist,
-            y: pos.y - dir.y * dist,
-            z: pos.z - dir.z * dist
+        const targetX = worldPos.x - worldDir.x * dist;
+        const targetY = worldPos.y - worldDir.y * dist;
+        const targetZ = worldPos.z - worldDir.z * dist;
+
+        // 4. 写真（a-plane）を作成
+        const plane = document.createElement('a-plane');
+
+        // 5. 重要：位置を「世界の絶対座標」に固定
+        plane.setAttribute('position', `${targetX} ${targetY} ${targetZ}`);
+
+        // 6. 配置した瞬間にだけ、カメラの方を向かせる
+        plane.object3D.lookAt(worldPos);
+
+        plane.setAttribute('material', 'shader:flat;side:double;transparent:true');
+
+        // 7. カメラの中（appendChild(camEl)）ではなく、シーンに追加する
+        sceneEl.appendChild(plane);
+
+        new THREE.TextureLoader().load(selectedImgUrl, tex => {
+            const mesh = plane.getObject3D('mesh');
+            mesh.material.map = tex;
+            mesh.material.needsUpdate = true;
+            const size = 0.8; // 少し大きめに設定
+            if (selectedAspect >= 1) {
+                plane.setAttribute('width', size);
+                plane.setAttribute('height', size / selectedAspect);
+            } else {
+                plane.setAttribute('height', size);
+                plane.setAttribute('width', size * selectedAspect);
+            }
         });
 
-        plane.setAttribute('material', `src: ${selectedImgUrl}; shader: flat; side: double; transparent: true;`);
-        plane.object3D.lookAt(pos);
-
-        const size = 0.6;
-        if (selectedAspect >= 1) {
-            plane.setAttribute('width', size);
-            plane.setAttribute('height', size / selectedAspect);
-        } else {
-            plane.setAttribute('height', size);
-            plane.setAttribute('width', size * selectedAspect);
-        }
-
-        arWorld.appendChild(plane);
-
-        selectedImgUrl = null;
+        canPlace = false;
         fileLabel.innerText = "① 写真を選ぶ";
-        fileLabel.style.background = "rgba(0,0,0,0.8)";
+        fileLabel.style.background = "rgba(0,0,0,.8)";
+    }
+    window.addEventListener('mousedown', addPhoto);
+    window.addEventListener('touchstart', addPhoto, { passive: false });
+
+    // --- 保存ロジック：座標と比率を物理的に一致させる ---
+    shotBtn.addEventListener('click', async () => {
+        try {
+            const video = document.querySelector('video');
+            const glCanvas = scene.canvas;
+            if (!video || !glCanvas) return;
+
+            // 1. 保存用キャンバスを「スマホ画面の見た目そのまま」のサイズで作成
+            const canvas = document.createElement('canvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const ctx = canvas.getContext('2d');
+
+            // 2. ビデオ背景を描画（表示領域に合わせて中央を切り抜く）
+            const vAspect = video.videoWidth / video.videoHeight;
+            const sAspect = canvas.width / canvas.height;
+            let sx, sy, sw, sh;
+            if (vAspect > sAspect) {
+                sw = video.videoHeight * sAspect;
+                sh = video.videoHeight;
+                sx = (video.videoWidth - sw) / 2;
+                sy = 0;
+            } else {
+                sw = video.videoWidth;
+                sh = video.videoWidth / sAspect;
+                sx = 0;
+                sy = (video.videoHeight - sh) / 2;
+            }
+            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
+            // 3. ARレイヤーを描画
+            scene.renderer.render(scene.object3D, scene.camera);
+
+            // 【重要】glCanvasの「画面に映っている部分だけ」を切り出す計算
+            // glCanvasはAR.jsによってビデオサイズ（例: 1280x720）になっているため
+            const cw = glCanvas.width;
+            const ch = glCanvas.height;
+            const cAspect = cw / ch;
+
+            let sourceX, sourceY, sourceW, sourceH;
+            if (cAspect > sAspect) {
+                sourceW = ch * sAspect;
+                sourceH = ch;
+                sourceX = (cw - sourceW) / 2;
+                sourceY = 0;
+            } else {
+                sourceW = cw;
+                sourceH = cw / sAspect;
+                sourceX = 0;
+                sourceY = (ch - sourceH) / 2;
+            }
+
+            // 見えている範囲だけをコピーして重ねる（これで白枠と歪みが消えます）
+            ctx.drawImage(glCanvas, sourceX, sourceY, sourceW, sourceH, 0, 0, canvas.width, canvas.height);
+
+            const url = canvas.toDataURL('image/jpeg', 0.8);
+            saveImage(url);
+        } catch (e) { console.error(e); }
     });
 
-    // 撮影機能
-    shotBtn.addEventListener('click', () => {
-        const video = document.querySelector('video');
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-
-        // 1. カメラ映像を描画
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // 2. A-Frameのレンダラーから3Dオブジェクトを重ねる
-        const sceneCanvas = scene.renderer.domElement;
-        ctx.drawImage(sceneCanvas, 0, 0, canvas.width, canvas.height);
-
-        // 3. ダウンロード
-        const link = document.createElement('a');
-        link.download = 'ar-photo.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    });
+    async function saveImage(url) {
+        const f = document.createElement('div');
+        f.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
+        document.body.appendChild(f);
+        setTimeout(() => {
+            f.style.transition = 'opacity .4s';
+            f.style.opacity = 0;
+            setTimeout(() => f.remove(), 400);
+        }, 50);
+        const blob = await (await fetch(url)).blob();
+        const file = new File([blob], `ar-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        if (navigator.share) {
+            try { await navigator.share({ files: [file] }); } catch (e) { }
+        } else {
+            const a = document.createElement('a');
+            a.href = url; a.download = file.name; a.click();
+        }
+    }
 };
